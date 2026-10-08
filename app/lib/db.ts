@@ -42,11 +42,11 @@ function opcionesPool(): mysql.PoolOptions {
       );
     }
 
-    if (user === "root") {
-      throw new Error(
-        "DB_USER=root no es adecuado en producción. Crea un usuario de aplicación con privilegios mínimos."
-      );
-    }
+   if (produccion && !enBuild && user === "root") {
+  throw new Error(
+    "DB_USER=root no es adecuado en producción. Crea un usuario de aplicación con permisos limitados."
+  );
+}
   }
 
   return {
