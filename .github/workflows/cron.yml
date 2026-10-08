@@ -1,0 +1,34 @@
+# Crons de la aplicación.
+#
+# Las rutas de recordatorios exigen
+# Authorization: Bearer <CRON_SECRET>, header que
+# Vercel crons no puede enviar. Por eso se usan
+# GitHub Actions (o crontab del VPS, ver README).
+#
+# Variables a configurar en el reposacio (secrets):
+#   APP_URL     https://tudominio.com
+#   CRON_SECRET valor compartido con la app
+
+name: Cron — recordatorios
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+jobs:
+  recordatorios:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Recordatorios de 12 horas
+        run: |
+          curl -fsS --max-time 300 \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.APP_URL }}/api/recordatorios/12-horas"
+
+      - name: Recordatorios de testimonios
+        run: |
+          curl -fsS --max-time 300 \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.APP_URL }}/api/recordatorios/testimonios"

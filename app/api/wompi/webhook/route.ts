@@ -1,9 +1,16 @@
 import { NextResponse } from "next/server";
 import crypto from "crypto";
+import type { RowDataPacket } from "mysql2";
 
 import pool from "../../../lib/db";
 import { enviarCorreo } from "../../../lib/email";
 import { crearEventoGoogleCalendar } from "../../../lib/google-calendar";
+
+// El proceso es largo (Calendar + correos).
+// En un VPS con `next start` este límite aplica
+// por request; ajusta según el host.
+export const runtime = "nodejs";
+export const maxDuration = 60;
 
 // ======================================================
 // TIPOS WOMPI
@@ -38,19 +45,19 @@ type WompiEvent = {
 // ======================================================
 
 function obtenerValorPorRuta(
-  objeto: Record<string, any>,
+  objeto: Record<string, unknown>,
   ruta: string
 ): unknown {
   const partes = ruta.split(".");
 
-  let valor: any = objeto;
+  let valor: unknown = objeto;
 
   for (const parte of partes) {
     if (valor === null || valor === undefined) {
       return undefined;
     }
 
-    valor = valor[parte];
+    valor = (valor as Record<string, unknown>)[parte];
   }
 
   return valor;
@@ -88,7 +95,7 @@ function compararFirmas(
 // FORMATEAR FECHA
 // ======================================================
 
-function formatearFecha(fecha: any): string {
+function formatearFecha(fecha: string | Date): string {
   try {
     const fechaObjeto =
       fecha instanceof Date
@@ -108,7 +115,7 @@ function formatearFecha(fecha: any): string {
 // FORMATEAR HORA
 // ======================================================
 
-function formatearHora(hora: any): string {
+function formatearHora(hora: string): string {
   if (!hora) {
     return "";
   }
@@ -183,8 +190,8 @@ async function enviarCorreosConfirmacion({
   emailCliente: string;
   emailAdministradora: string | null;
   servicio: string;
-  fecha: any;
-  hora: any;
+  fecha: string | Date;
+  hora: string;
   modalidad: string;
   monto: number;
   referencia: string;
@@ -731,7 +738,7 @@ async function enviarCorreosConfirmacion({
     });
 
     console.log(
-      `Correo de confirmación enviado al paciente: ${emailCliente}`
+      "Correo de confirmación enviado al paciente."
     );
   } catch (error) {
     console.error(
@@ -754,7 +761,7 @@ async function enviarCorreosConfirmacion({
       });
 
       console.log(
-        `Correo de nueva cita enviado a la administradora: ${emailAdministradora}`
+        "Correo de nueva cita enviado a la administradora."
       );
     } catch (error) {
       console.error(
@@ -843,7 +850,7 @@ export async function POST(request: Request) {
     for (const propiedad of propiedades) {
       const valor =
         obtenerValorPorRuta(
-          evento.data as Record<string, any>,
+          evento.data as Record<string, unknown>,
           propiedad
         );
 
@@ -968,8 +975,8 @@ export async function POST(request: Request) {
         | string
         | null;
         servicio: string;
-        fecha: any;
-        hora: any;
+        fecha: string | Date;
+        hora: string;
         modalidad: string;
         monto: number;
         referencia: string;
@@ -1000,8 +1007,8 @@ export async function POST(request: Request) {
       // BUSCAR PAGO + CITA + CLIENTE + SERVICIO
       // =================================================
 
-      const [pagos]: any =
-        await conexion.query(
+      const [pagos] =
+        await conexion.query<RowDataPacket[]>(
           `
           SELECT
             p.id,
@@ -1037,6 +1044,8 @@ export async function POST(request: Request) {
           WHERE p.referencia = ?
 
           LIMIT 1
+
+          FOR UPDATE
           `,
           [referencia]
         );
@@ -1061,6 +1070,63 @@ export async function POST(request: Request) {
       }
 
       const pago = pagos[0];
+
+      // =================================================
+      // IDEMPOTENCIA POR TRANSACCION_ID
+      // =================================================
+      // Wompi reenvía eventos. Si esta transacción ya fue
+      // procesada para el mismo pago, respondemos idempotente
+      // sin re-procesar (evita Meet y correos duplicados).
+      if (
+        pago.transaccion_id === transaccionId &&
+        pago.estado === "APROBADO"
+      ) {
+        await conexion.rollback();
+
+        console.log(
+          `Webhook Wompi idempotente: transacción ${transaccionId} ya procesada.`
+        );
+
+        return NextResponse.json({
+          recibido: true,
+          procesado: true,
+          idempotente: true,
+          referencia,
+          estado_wompi: status,
+          estado_pago: "APROBADO",
+          estado_cita: "CONFIRMADA",
+          notificaciones_enviadas: false,
+        });
+      }
+
+      // La transacción no puede estar asociada a otro pago.
+      const [transaccionesExistentes] =
+        await conexion.query<RowDataPacket[]>(
+          `
+          SELECT id
+          FROM pagos
+          WHERE transaccion_id = ?
+            AND id <> ?
+          LIMIT 1
+          `,
+          [transaccionId, pago.id]
+        );
+
+      if (transaccionesExistentes.length > 0) {
+        await conexion.rollback();
+
+        console.warn(
+          "Wompi envió una transacción que ya está asociada a otro pago.",
+          { referencia }
+        );
+
+        return NextResponse.json(
+          {
+            error: "La transacción ya está asociada a otro pago.",
+          },
+          { status: 409 }
+        );
+      }
 
       // =================================================
       // VALIDAR MONTO Y MONEDA
@@ -1244,8 +1310,8 @@ export async function POST(request: Request) {
         // OBTENER EMAIL DE LA ADMINISTRADORA
         // ===============================================
 
-        const [administradores]: any =
-          await conexion.query(
+        const [administradores] =
+          await conexion.query<RowDataPacket[]>(
             `
             SELECT email
             FROM administradores
@@ -1258,8 +1324,8 @@ export async function POST(request: Request) {
         // OBTENER DIRECCIÓN
         // ===============================================
 
-        const [configuraciones]: any =
-          await conexion.query(
+        const [configuraciones] =
+          await conexion.query<RowDataPacket[]>(
             `
             SELECT direccion
             FROM configuracion_general

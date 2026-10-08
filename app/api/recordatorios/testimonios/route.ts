@@ -5,10 +5,13 @@ import {
   timingSafeEqual,
 } from "crypto";
 
+import type { RowDataPacket, ResultSetHeader } from "mysql2";
+
 import pool from "../../../lib/db";
 import { enviarCorreo } from "../../../lib/email";
 
 export const runtime = "nodejs";
+export const maxDuration = 300;
 
 // ======================================================
 // AUTORIZACIÓN DEL PROCESO AUTOMÁTICO
@@ -135,7 +138,7 @@ export async function GET(request: Request) {
     // Buscar citas completadas cuya duración ya terminó.
     // La solicitud única por cita evita duplicar invitaciones.
 
-    const [citas]: any = await pool.query(
+    const [citas] = await pool.query<RowDataPacket[]>(
       `
         SELECT
           c.id AS cita_id,
@@ -181,7 +184,7 @@ export async function GET(request: Request) {
         encontradas: citas.length,
         correosEnviados: 0,
         registrosCreados: 0,
-        citas: citas.map((cita: any) => ({
+        citas: citas.map((cita: RowDataPacket) => ({
           cita_id: cita.cita_id,
           fecha: formatearFecha(cita.fecha),
           hora: String(cita.hora).slice(0, 5),
@@ -231,10 +234,8 @@ export async function GET(request: Request) {
         // solicitudes duplicadas, incluso si se ejecuta
         // el proceso más de una vez.
 
-        let resultadoInsert: any;
-
         try {
-          const [resultado]: any = await pool.query(
+          await pool.query<ResultSetHeader>(
             `
               INSERT INTO solicitudes_testimonio (
                 cita_id,
@@ -254,11 +255,13 @@ export async function GET(request: Request) {
             [cita.cita_id, tokenHash]
           );
 
-          resultadoInsert = resultado;
           solicitudCreada = true;
-        } catch (error: any) {
+        } catch (error) {
           // Error MySQL 1062 = entrada duplicada.
-          if (error?.code === "ER_DUP_ENTRY") {
+          if (
+            (error as Record<string, unknown>)?.code ===
+            "ER_DUP_ENTRY"
+          ) {
             omitidas++;
             continue;
           }
@@ -413,7 +416,7 @@ export async function GET(request: Request) {
         );
 
         enviadas++;
-      } catch (error: any) {
+      } catch (error) {
         console.error(
           `Error procesando el testimonio de la cita ${cita.cita_id}:`,
           error
@@ -437,8 +440,10 @@ export async function GET(request: Request) {
                   AND estado = 'PENDIENTE'
               `,
               [
-                String(error?.message || "Error al enviar el correo.")
-                  .slice(0, 1000),
+                String(
+                  (error as Record<string, unknown>)?.message ||
+                    "Error al enviar el correo."
+                ).slice(0, 1000),
                 cita.cita_id,
               ]
             );

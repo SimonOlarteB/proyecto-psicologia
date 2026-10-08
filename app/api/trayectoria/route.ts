@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import type { ResultSetHeader } from "mysql2";
 import pool from "../../lib/db";
 import { verificarSesion } from "../../lib/auth";
 
@@ -96,7 +97,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const [resultado]: any = await pool.query(
+    const [resultado] = await pool.query<ResultSetHeader>(
       `
       INSERT INTO trayectoria (
         tipo,
@@ -196,7 +197,7 @@ export async function PUT(request: Request) {
       );
     }
 
-    const [resultado]: any = await pool.query(
+    const [resultado] = await pool.query<ResultSetHeader>(
       `
       UPDATE trayectoria
       SET
@@ -274,7 +275,7 @@ export async function DELETE(request: Request) {
       );
     }
 
-    const [resultado]: any = await pool.query(
+    const [resultado] = await pool.query<ResultSetHeader>(
       `
       UPDATE trayectoria
       SET activo = 0

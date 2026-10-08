@@ -1,6 +1,8 @@
 import { google } from "googleapis";
+import type { RowDataPacket } from "mysql2";
 import pool from "./db";
 import crypto from "crypto";
+import { descifrarToken } from "./seguridad-tokens";
 
 type CrearEventoGoogleParams = {
   fecha: string | Date;
@@ -17,13 +19,27 @@ type ResultadoEventoGoogle = {
   meetLink: string | null;
 };
 
+// Solo la parte de conferenceData que
+// usa extraerMeetLink. Todo es opcional
+// porque Google puede devolver cualquier
+// subconjunto de campos.
+type PuntoDeEntrada = {
+  entryPointType?: string | null;
+  uri?: string | null;
+};
+
+type ConferenceData = {
+  entryPoints?: PuntoDeEntrada[];
+  createRequest?: { status?: { statusCode?: string | null } };
+};
+
 /**
  * Prepara el cliente autenticado de Google Calendar,
  * junto con la configuración guardada (calendar_id).
  * La usan tanto crear como actualizar eventos.
  */
 async function obtenerClienteCalendar() {
-  const [configuraciones]: any = await pool.query(
+  const [configuraciones] = await pool.query<RowDataPacket[]>(
     `SELECT refresh_token, calendar_id
      FROM google_calendar_config
      WHERE activo = 1
@@ -56,7 +72,9 @@ async function obtenerClienteCalendar() {
   );
 
   oauth2Client.setCredentials({
-    refresh_token: configuracion.refresh_token,
+    refresh_token: descifrarToken(
+      configuracion.refresh_token
+    ),
   });
 
   const calendar = google.calendar({
@@ -575,14 +593,14 @@ function formatearFechaBogota(
  * desde conferenceData.
  */
 function extraerMeetLink(
-  conferenceData: any
+  conferenceData: ConferenceData | null | undefined
 ): string | null {
   const entries =
     conferenceData?.entryPoints || [];
 
   const videoEntry =
     entries.find(
-      (entry: any) =>
+      (entry) =>
         entry.entryPointType ===
           "video" &&
         typeof entry.uri ===

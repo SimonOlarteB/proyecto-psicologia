@@ -1,6 +1,10 @@
 import mysql from "mysql2/promise";
 import crypto from "crypto";
 import readline from "readline";
+import {
+  opcionesMysql,
+  validarConfiguracionMysql,
+} from "./mysql-config.mjs";
 
 const rl = readline.createInterface({
   input: process.stdin,
@@ -51,12 +55,13 @@ async function restablecerAdministrador() {
       );
     }
 
-    conexion = await mysql.createConnection({
-      host: "127.0.0.1",
-      user: "root",
-      password: "",
-      database: "psicologia",
-    });
+    // Misma configuración que la app: DB_HOST, DB_USER, etc.
+    // Nunca root@127.0.0.1 en producción.
+    validarConfiguracionMysql();
+
+    conexion = await mysql.createConnection(
+      opcionesMysql()
+    );
 
     const [filas] = await conexion.execute(
       `

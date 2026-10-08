@@ -1,9 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { mkdir, writeFile } from "fs/promises";
-import path from "path";
-import crypto from "crypto";
 import { verificarSesion } from "../../../../lib/auth";
+import { guardarImagenSubida } from "../../../../lib/uploads";
 
 export const runtime = "nodejs";
 
@@ -56,40 +54,11 @@ export async function POST(request: Request) {
             );
         }
 
-        const extensiones: Record<string, string> = {
-            "image/jpeg": "jpg",
-            "image/png": "png",
-            "image/webp": "webp",
-        };
-
-        const extension = extensiones[archivo.type];
-
-        const nombreArchivo = `${crypto.randomUUID()}.${extension}`;
-
-        const carpeta = path.join(
-            process.cwd(),
-            "public",
-            "uploads",
-            "logo"
-        );
-
-        await mkdir(carpeta, { recursive: true });
-
-        const rutaArchivo = path.join(
-            carpeta,
-            nombreArchivo
-        );
-
-        const bytes = await archivo.arrayBuffer();
-
-        await writeFile(
-            rutaArchivo,
-            Buffer.from(bytes)
-        );
+        const { url } = await guardarImagenSubida("logo", archivo);
 
         return NextResponse.json({
             ok: true,
-            url: `/uploads/logo/${nombreArchivo}`,
+            url,
         });
     } catch (error) {
         console.error(

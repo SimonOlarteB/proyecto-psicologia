@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import type { ResultSetHeader, RowDataPacket } from "mysql2";
 
 import pool from "./../../../lib/db";
 import { verificarSesion } from "./../../../lib/auth";
@@ -44,7 +45,7 @@ async function limpiarPagosPendientes() {
       // BUSCAR PAGOS PENDIENTES VENCIDOS
       // ==================================================
 
-      const [pagosVencidos]: any = await conexion.query(`
+      const [pagosVencidos] = await conexion.query<RowDataPacket[]>(`
         SELECT
           p.id AS pago_id,
           p.cita_id,
@@ -79,13 +80,13 @@ async function limpiarPagosPendientes() {
       // ==================================================
 
       const pagoIds = pagosVencidos.map(
-        (pago: any) => pago.pago_id
+        (pago) => pago.pago_id
       );
 
       const citaIds = [
         ...new Set(
           pagosVencidos.map(
-            (pago: any) => pago.cita_id
+            (pago) => pago.cita_id
           )
         ),
       ];
@@ -98,8 +99,8 @@ async function limpiarPagosPendientes() {
         .map(() => "?")
         .join(",");
 
-      const [resultadoPagos]: any =
-        await conexion.query(
+      const [resultadoPagos] =
+        await conexion.query<ResultSetHeader>(
           `
           UPDATE pagos
           SET
@@ -119,8 +120,7 @@ async function limpiarPagosPendientes() {
         .map(() => "?")
         .join(",");
 
-      const [resultadoCitas]: any =
-        await conexion.query(
+      await conexion.query<ResultSetHeader>(
           `
           UPDATE citas
           SET
@@ -149,7 +149,7 @@ async function limpiarPagosPendientes() {
         cantidad: resultadoPagos.affectedRows,
         pagos_cancelados: pagoIds,
         citas_canceladas: citaIds,
-        detalles: pagosVencidos.map((pago: any) => ({
+        detalles: pagosVencidos.map((pago) => ({
           pago_id: pago.pago_id,
           cita_id: pago.cita_id,
           referencia: pago.referencia,

@@ -1,10 +1,8 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { mkdir, writeFile } from "fs/promises";
-import path from "path";
-import crypto from "crypto";
 
 import { verificarSesion } from "../../../lib/auth";
+import { guardarImagenSubida } from "../../../lib/uploads";
 
 export const runtime = "nodejs";
 
@@ -74,49 +72,7 @@ export async function POST(request: Request) {
             );
         }
 
-        // Extensión según el tipo de imagen
-        const extensiones: Record<string, string> = {
-            "image/jpeg": "jpg",
-            "image/png": "png",
-            "image/webp": "webp",
-        };
-
-        const extension = extensiones[archivo.type];
-
-        // Nombre único para evitar conflictos
-        const nombreArchivo =
-            `${crypto.randomUUID()}.${extension}`;
-
-        // Crear carpeta
-        const carpeta = path.join(
-            process.cwd(),
-            "public",
-            "uploads",
-            "trayectoria"
-        );
-
-        await mkdir(carpeta, {
-            recursive: true,
-        });
-
-        // Convertir archivo
-        const bytes = await archivo.arrayBuffer();
-        const buffer = Buffer.from(bytes);
-
-        // Guardar físicamente
-        const rutaArchivo = path.join(
-            carpeta,
-            nombreArchivo
-        );
-
-        await writeFile(
-            rutaArchivo,
-            buffer
-        );
-
-        // Ruta pública
-        const url =
-            `/uploads/trayectoria/${nombreArchivo}`;
+        const { url } = await guardarImagenSubida("trayectoria", archivo);
 
         return NextResponse.json({
             ok: true,

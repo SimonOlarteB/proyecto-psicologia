@@ -24,6 +24,26 @@ type ContextoDisponibilidad = {
   servicioId: number;
   duracionMinutos: number | null;
 };
+
+// Forma de las respuestas JSON de las rutas
+// que consulta obtenerHorasDisponibles.
+type DisponibilidadSemanal = {
+  dia_semana: number;
+  hora_inicio: string;
+  hora_fin: string;
+};
+
+type DisponibilidadEspecial = {
+  fecha: string;
+  hora_inicio?: string;
+  hora_fin?: string;
+};
+
+type CitaAgenda = {
+  id: number;
+  hora: string;
+  duracion_minutos?: number | null;
+};
  
 function generarHoras(horaInicio: string, horaFin: string): string[] {
   const horas: string[] = [];
@@ -38,7 +58,7 @@ function generarHoras(horaInicio: string, horaFin: string): string[] {
   return horas;
 }
  
-async function leerJson(url: string): Promise<any> {
+async function leerJson(url: string): Promise<unknown> {
   const respuesta = await fetch(url, { cache: "no-store" });
  
   if (!respuesta.ok) {
@@ -65,9 +85,12 @@ export async function obtenerHorasDisponibles(
     leerJson(`${appUrl}/api/bloqueos-agenda?fecha=${encodeURIComponent(fecha)}`),
   ]);
  
-  const listaSemanal: any[] = Array.isArray(semanal) ? semanal : [];
-  const listaEspeciales: any[] = Array.isArray(especiales) ? especiales : [];
-  const listaCitas: any[] = Array.isArray(citas) ? citas : [];
+  const listaSemanal: DisponibilidadSemanal[] =
+    Array.isArray(semanal) ? semanal : [];
+  const listaEspeciales: DisponibilidadEspecial[] =
+    Array.isArray(especiales) ? especiales : [];
+  const listaCitas: CitaAgenda[] =
+    Array.isArray(citas) ? citas : [];
   const listaBloqueos: { inicio: string; fin: string }[] =
     Array.isArray(bloqueos) ? bloqueos : [];
  

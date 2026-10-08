@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import crypto from "crypto";
+import type { RowDataPacket } from "mysql2";
 import pool from "../../../lib/db";
 import { enviarCorreo } from "../../../lib/email";
 
@@ -8,6 +9,9 @@ import { enviarCorreo } from "../../../lib/email";
 // ======================================================
 
 export const runtime = "nodejs";
+// Envío de hasta N correos por ejecución; el host
+// debe respetar el límite (VPS con `next start`).
+export const maxDuration = 300;
 
 // ======================================================
 // VALIDAR CLAVE DEL PROCESO AUTOMÁTICO
@@ -185,7 +189,7 @@ export async function GET(request: Request) {
     // BUSCAR CITAS CONFIRMADAS
     // ----------------------------------------------------
 
-    const [citas]: any = await pool.query(
+    const [citas] = await pool.query<RowDataPacket[]>(
       `
         SELECT
           c.id,
@@ -237,7 +241,7 @@ if (dryRun) {
     encontradas: citas.length,
     correosEnviados: 0,
     registrosModificados: 0,
-    citas: citas.map((cita: any) => ({
+    citas: citas.map((cita: RowDataPacket) => ({
       id: cita.id,
       fecha: formatearFecha(cita.fecha),
       hora: formatearHora(cita.hora),

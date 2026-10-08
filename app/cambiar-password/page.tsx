@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import Link from "next/link";
 
 export default function CambiarPasswordPage() {
     const [passwordActual, setPasswordActual] = useState("");
@@ -312,12 +313,12 @@ export default function CambiarPasswordPage() {
 
                     {/* VOLVER */}
                     <div className="mt-6 text-center">
-                        <a
+                        <Link
                             href="/"
                             className="text-sm text-[#707469] transition hover:text-[#C56835]"
                         >
                             ← Volver al sitio web
-                        </a>
+                        </Link>
                     </div>
                 </section>
             </div>

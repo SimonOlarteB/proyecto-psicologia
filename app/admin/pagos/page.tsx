@@ -137,9 +137,6 @@ export default function PagosAdmin() {
 
   async function cargarPagos() {
     try {
-      setCargando(true);
-      setError("");
-
       const respuesta = await fetch("/api/pagos", {
         cache: "no-store",
       });
@@ -167,7 +164,37 @@ export default function PagosAdmin() {
   }
 
   useEffect(() => {
-    cargarPagos();
+    let activa = true;
+
+    void fetch("/api/pagos", { cache: "no-store" })
+      .then(async (respuesta) => {
+        const datos = await respuesta.json();
+
+        if (!respuesta.ok) {
+          throw new Error(
+            datos?.error || "No se pudieron cargar los pagos."
+          );
+        }
+
+        if (activa) setPagos(datos);
+      })
+      .catch((error: unknown) => {
+        if (!activa) return;
+
+        console.error("Error cargando pagos:", error);
+        setError(
+          error instanceof Error
+            ? error.message
+            : "No se pudieron cargar los pagos."
+        );
+      })
+      .finally(() => {
+        if (activa) setCargando(false);
+      });
+
+    return () => {
+      activa = false;
+    };
   }, []);
 
   const pagosFiltrados = useMemo(() => {
@@ -240,7 +267,12 @@ export default function PagosAdmin() {
 
             <button
               type="button"
-              onClick={cargarPagos}
+              onClick={() => {
+                setCargando(true);
+                setError("");
+
+                cargarPagos();
+              }}
               disabled={cargando}
               className="inline-flex min-h-11 items-center justify-center rounded-full border border-[#59614D] px-5 py-2.5 text-sm font-medium text-[#59614D] transition hover:bg-[#59614D] hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
             >

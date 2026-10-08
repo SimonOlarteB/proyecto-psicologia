@@ -1,16 +1,10 @@
 import Link from "next/link";
+import {
+  obtenerPublicacionPublica,
+  type PublicacionPublica,
+} from "../../lib/contenido-publico";
 
-interface Publicacion {
-  id: number;
-  titulo: string;
-  resumen: string | null;
-  contenido: string;
-  imagen_url: string | null;
-  estado: "BORRADOR" | "PUBLICADO";
-  fecha_publicacion: string | null;
-  creado_en: string;
-  actualizado_en: string;
-}
+export const dynamic = "force-dynamic";
 
 interface Props {
   params: Promise<{
@@ -20,27 +14,12 @@ interface Props {
 
 async function obtenerPublicacion(
   id: string
-): Promise<Publicacion | null> {
+): Promise<PublicacionPublica | null> {
   try {
-    const respuesta = await fetch(
-      `http://localhost:3000/api/publicaciones`,
-      {
-        cache: "no-store",
-      }
-    );
-
-    if (!respuesta.ok) {
-      return null;
-    }
-
-    const publicaciones: Publicacion[] =
-      await respuesta.json();
-
-    const publicacion = publicaciones.find(
-      (item) => String(item.id) === id
-    );
-
-    return publicacion || null;
+    // Lectura directa desde MySQL en el Server Component.
+    // Nunca hacer fetch a localhost en runtime: en el host
+    // de producción esas rutas no existen.
+    return await obtenerPublicacionPublica(id);
   } catch (error) {
     console.error(
       "Error obteniendo publicación:",

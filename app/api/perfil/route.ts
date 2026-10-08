@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import type { RowDataPacket, ResultSetHeader } from "mysql2";
 import pool from "../../lib/db";
 import { verificarSesion } from "../../lib/auth";
 
@@ -14,7 +15,7 @@ async function obtenerSesionAdmin() {
 // PÚBLICO
 export async function GET() {
   try {
-    const [filas]: any = await pool.query(`
+    const [filas] = await pool.query<RowDataPacket[]>(`
       SELECT
         id,
         nombre_profesional,
@@ -86,7 +87,7 @@ export async function PUT(request: Request) {
       );
     }
 
-    const [filas]: any = await pool.query(`
+    const [filas] = await pool.query<RowDataPacket[]>(`
       SELECT id
       FROM configuracion_general
       ORDER BY id ASC
@@ -126,7 +127,7 @@ export async function PUT(request: Request) {
         : null;
 
     if (filas.length === 0) {
-      const [resultado]: any = await pool.query(
+      const [resultado] = await pool.query<ResultSetHeader>(
         `
         INSERT INTO configuracion_general (
           nombre_profesional,

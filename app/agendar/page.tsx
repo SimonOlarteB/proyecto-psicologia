@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { formatearDuracion } from "../lib/duracion";
 import {
   agregarMinutosAFechaHora,
@@ -30,22 +31,46 @@ type ResultadoProximaDisponibilidad = {
   proxima: { fecha: string; hora: string } | null;
 };
 
+type Disponibilidad = {
+  id: number;
+  dia_semana: number;
+  hora_inicio: string;
+  hora_fin: string;
+  activo: number;
+};
+
+type DisponibilidadEspecial = {
+  id: number;
+  fecha: string;
+  hora_inicio: string | null;
+  hora_fin: string | null;
+  activo: number;
+};
+
+type CitaCreada = {
+  cita_id: number;
+  fecha: string;
+  hora: string;
+  modalidad: string;
+  servicio: string;
+  referencia: string;
+  monto: number;
+};
+
 export default function AgendarPage() {
   const [servicios, setServicios] = useState<Servicio[]>([]);
   const [servicioSeleccionado, setServicioSeleccionado] = useState("");
   const [modalidad, setModalidad] = useState("");
   const [fecha, setFecha] = useState("");
   const [hora, setHora] = useState("");
-  const [disponibilidad, setDisponibilidad] = useState<any[]>([]);
+  const [disponibilidad, setDisponibilidad] = useState<Disponibilidad[]>([]);
   const [disponibilidadesEspeciales, setDisponibilidadesEspeciales] =
-    useState<any[]>([]);
+    useState<DisponibilidadEspecial[]>([]);
 
-  const [horasDisponibles, setHorasDisponibles] = useState<string[]>([]);
   const [horasOcupadas, setHorasOcupadas] = useState<
     { hora: string; duracion_minutos: number }[]
   >([]);
   const [bloqueosAgenda, setBloqueosAgenda] = useState<BloqueoAgenda[]>([]);
-  const [horaFinDisponibilidad, setHoraFinDisponibilidad] = useState("");
   const [resultadoProximaDisponibilidad, setResultadoProximaDisponibilidad] =
     useState<ResultadoProximaDisponibilidad | null>(null);
 
@@ -53,8 +78,8 @@ export default function AgendarPage() {
   const [email, setEmail] = useState("");
   const [telefono, setTelefono] = useState("");
   const [aceptaDatos, setAceptaDatos] = useState(false);
-  const [mostrarConfirmacion, setMostrarConfirmacion] = useState(false);
-  const [citaCreada, setCitaCreada] = useState<any>(null);
+  const [mostrarConfirmacion] = useState(false);
+  const [citaCreada, setCitaCreada] = useState<CitaCreada | null>(null);
 
   const [mostrarAlerta, setMostrarAlerta] = useState(false);
   const [datosAlerta, setDatosAlerta] = useState<{
@@ -199,10 +224,6 @@ export default function AgendarPage() {
     };
   }
 
-  const hayHoraDisponible = horasDisponibles.some(
-    (horaDisponible) => obtenerEstadoHora(horaDisponible).disponible
-  );
-
   function generarHoras(
     horaInicio: string,
     horaFin: string
@@ -250,12 +271,9 @@ export default function AgendarPage() {
     return `${hora12}:${minutos} ${periodo}`;
   }
 
-  useEffect(() => {
+  const { horasDisponibles, horaFinDisponibilidad } = useMemo(() => {
     if (!fecha) {
-      setHorasDisponibles([]);
-      setHoraFinDisponibilidad("");
-      setHora("");
-      return;
+      return { horasDisponibles: [] as string[], horaFinDisponibilidad: "" };
     }
 
     const fechaSeleccionada =
@@ -283,21 +301,16 @@ export default function AgendarPage() {
         !disponibilidadEspecial.hora_inicio ||
         !disponibilidadEspecial.hora_fin
       ) {
-        setHorasDisponibles([]);
-        setHoraFinDisponibilidad("");
-        setHora("");
-        return;
+        return { horasDisponibles: [] as string[], horaFinDisponibilidad: "" };
       }
 
-      const horas = generarHoras(
-        disponibilidadEspecial.hora_inicio,
-        disponibilidadEspecial.hora_fin
-      );
-
-      setHorasDisponibles(horas);
-      setHoraFinDisponibilidad(disponibilidadEspecial.hora_fin);
-      setHora("");
-      return;
+      return {
+        horasDisponibles: generarHoras(
+          disponibilidadEspecial.hora_inicio,
+          disponibilidadEspecial.hora_fin
+        ),
+        horaFinDisponibilidad: disponibilidadEspecial.hora_fin,
+      };
     }
 
     // ==========================================
@@ -312,25 +325,25 @@ export default function AgendarPage() {
       );
 
     if (!disponibilidadDia) {
-      setHorasDisponibles([]);
-      setHoraFinDisponibilidad("");
-      setHora("");
-      return;
+      return { horasDisponibles: [] as string[], horaFinDisponibilidad: "" };
     }
 
-    const horas = generarHoras(
-      disponibilidadDia.hora_inicio,
-      disponibilidadDia.hora_fin
-    );
-
-    setHorasDisponibles(horas);
-    setHoraFinDisponibilidad(disponibilidadDia.hora_fin);
-    setHora("");
+    return {
+      horasDisponibles: generarHoras(
+        disponibilidadDia.hora_inicio,
+        disponibilidadDia.hora_fin
+      ),
+      horaFinDisponibilidad: disponibilidadDia.hora_fin,
+    };
   }, [
     fecha,
     disponibilidad,
     disponibilidadesEspeciales,
   ]);
+
+  const hayHoraDisponible = horasDisponibles.some(
+    (horaDisponible) => obtenerEstadoHora(horaDisponible).disponible
+  );
 
   useEffect(() => {
     if (!fecha || !servicioActual || hayHoraDisponible) return;
@@ -679,19 +692,19 @@ export default function AgendarPage() {
 
         <header className="border-b border-[#D8D0C5] bg-[#F7F1E9]/95">
           <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-5">
-            <a
+            <Link
               href="/"
               className="font-serif text-xl text-[#3F4635]"
             >
               Aura Elisa Sánchez
-            </a>
+            </Link>
 
-            <a
+            <Link
               href="/"
               className="text-sm text-[#707469] hover:text-[#C56835]"
             >
               Volver al inicio
-            </a>
+            </Link>
           </div>
         </header>
 

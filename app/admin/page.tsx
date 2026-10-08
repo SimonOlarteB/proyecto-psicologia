@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import AdminNav from "../components/AdminNav";
 
 type DisponibilidadSemanal = {
@@ -19,8 +20,22 @@ type CitaOcupada = {
     hora: string;
 };
 
+type Cita = {
+    id: number;
+    fecha: string;
+    hora: string;
+    modalidad: string;
+    estado: string;
+    origen_reserva: string | null;
+    nombre_completo: string;
+    email: string;
+    telefono: string;
+    servicio_nombre: string;
+    cedula?: string | null;
+};
+
 export default function AdminPage() {
-    const [citas, setCitas] = useState<any[]>([]);
+    const [citas, setCitas] = useState<Cita[]>([]);
     const [cargando, setCargando] = useState(true);
     const [filtro, setFiltro] = useState("TODAS");
     const [busqueda, setBusqueda] = useState("");
@@ -33,10 +48,10 @@ export default function AdminPage() {
             .replace(/[\u0300-\u036f]/g, "")
             .toLowerCase();
     }
-    const [citaSeleccionada, setCitaSeleccionada] = useState<any>(null);
+    const [citaSeleccionada, setCitaSeleccionada] = useState<Cita | null>(null);
 
     const [accionPendiente, setAccionPendiente] = useState<{
-        cita: any;
+        cita: Cita;
         estado: string;
     } | null>(null);
 
@@ -61,7 +76,7 @@ export default function AdminPage() {
     // REPROGRAMACIÓN
     // ================================
 
-    const [citaReprogramar, setCitaReprogramar] = useState<any>(null);
+    const [citaReprogramar, setCitaReprogramar] = useState<Cita | null>(null);
     const [nuevaFecha, setNuevaFecha] = useState("");
     const [nuevaHora, setNuevaHora] = useState("");
     const [horasDisponibles, setHorasDisponibles] = useState<string[]>([]);
@@ -72,26 +87,28 @@ export default function AdminPage() {
         useState(false);
 
     useEffect(() => {
-        cargarCitas();
+        let activa = true;
+
+        void fetch("/api/citas")
+            .then(async (respuesta) => {
+                if (!respuesta.ok) {
+                    throw new Error("No se pudieron cargar las citas");
+                }
+
+                const datos = await respuesta.json();
+                if (activa) setCitas(datos);
+            })
+            .catch((error: unknown) => {
+                if (activa) console.error("Error cargando citas:", error);
+            })
+            .finally(() => {
+                if (activa) setCargando(false);
+            });
+
+        return () => {
+            activa = false;
+        };
     }, []);
-
-    async function cargarCitas() {
-        try {
-            const respuesta = await fetch("/api/citas");
-
-            if (!respuesta.ok) {
-                throw new Error("No se pudieron cargar las citas");
-            }
-
-            const datos = await respuesta.json();
-
-            setCitas(datos);
-        } catch (error) {
-            console.error("Error cargando citas:", error);
-        } finally {
-            setCargando(false);
-        }
-    }
 
     const citasFiltradas = citas.filter((cita) => {
         const ahora = new Date();
@@ -124,7 +141,7 @@ export default function AdminPage() {
         // a la base de datos, esta misma búsqueda la incluirá
         // automáticamente (cita.cedula), sin tener que tocar esto.
         const nombre = normalizarTexto(String(cita.nombre_completo || ""));
-        const cedula = normalizarTexto(String((cita as any).cedula || ""));
+        const cedula = normalizarTexto(String(cita.cedula || ""));
 
         return nombre.includes(termino) || cedula.includes(termino);
     }).sort((a, b) => {
@@ -426,7 +443,7 @@ export default function AdminPage() {
     // ABRIR REPROGRAMACIÓN
     // ================================
 
-    function abrirReprogramacion(cita: any) {
+    function abrirReprogramacion(cita: Cita) {
         setCitaReprogramar(cita);
         setNuevaFecha("");
         setNuevaHora("");
@@ -559,12 +576,12 @@ export default function AdminPage() {
                             </p>
                         </div>
 
-                        <a
+                        <Link
                             href="/"
                             className="text-sm text-[#707469] transition hover:text-[#C56835]"
                         >
                             Volver al sitio
-                        </a>
+                        </Link>
 
                     </div>
                 </header>

@@ -1,4 +1,5 @@
 import { createHash } from "crypto";
+import type { RowDataPacket } from "mysql2";
 import pool from "./db";
 
 // Debe coincidir EXACTAMENTE con la función generarHash()
@@ -38,7 +39,7 @@ export async function obtenerSolicitudValidada(
 
   const tokenHash = generarHashToken(token);
 
-  const [filas]: any = await pool.query(
+  const [filas] = await pool.query<RowDataPacket[]>(
     `
       SELECT
         st.id,

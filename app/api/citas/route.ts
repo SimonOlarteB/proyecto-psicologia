@@ -1,10 +1,21 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import type { ResultSetHeader, RowDataPacket } from "mysql2";
 import pool from "./../../lib/db";
 import { verificarSesion } from "./../../lib/auth";
 import { enviarCorreo } from "./../../lib/email";
 import { actualizarEventoGoogleCalendar } from "./../../lib/google-calendar";
 import { horariosSeCruzan } from "./../../lib/horarios";
+import { obtenerAppUrl } from "./../../lib/app-url";
+import {
+  ipDelCliente,
+  permitirIntento,
+} from "./../../lib/rate-limit";
+
+type CitaOcupada = RowDataPacket & {
+  hora: string;
+  duracion_minutos: number;
+};
 
 async function obtenerSesionAdmin() {
   const cookieStore = await cookies();
@@ -15,6 +26,19 @@ async function obtenerSesionAdmin() {
 
 export async function POST(request: Request) {
   try {
+    // Protección contra abuso de reservas:
+    // 20 solicitudes por IP cada hora.
+    const ip = ipDelCliente(request);
+
+    if (!permitirIntento(`citas:${ip}`, 20, 60 * 60 * 1000)) {
+      return NextResponse.json(
+        {
+          error: "Demasiadas solicitudes. Inténtalo en unos minutos.",
+        },
+        { status: 429 }
+      );
+    }
+
     const datos = await request.json();
 
     const {
@@ -55,7 +79,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const [servicios]: any = await pool.query(
+    const [servicios] = await pool.query<RowDataPacket[]>(
       `
       SELECT
         id,
@@ -92,7 +116,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const [citasExistentes]: any = await pool.query(
+    const [citasExistentes] = await pool.query<CitaOcupada[]>(
       `
       SELECT c.hora, s.duracion_minutos
       FROM citas c
@@ -103,10 +127,7 @@ export async function POST(request: Request) {
       [fecha]
     );
 
-    const hayCruce = citasExistentes.some((cita: {
-      hora: string;
-      duracion_minutos: number;
-    }) =>
+    const hayCruce = citasExistentes.some((cita) =>
       horariosSeCruzan(
         hora,
         Number(servicios[0].duracion_minutos),
@@ -124,7 +145,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const [bloqueos]: any = await pool.query(
+    const [bloqueos] = await pool.query<RowDataPacket[]>(
       `
       SELECT id
       FROM bloqueos_agenda
@@ -149,7 +170,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const [clientes]: any = await pool.query(
+    const [clientes] = await pool.query<RowDataPacket[]>(
       `
       SELECT id
       FROM clientes
@@ -177,7 +198,7 @@ export async function POST(request: Request) {
         [nombre_completo, telefono, clienteId]
       );
     } else {
-      const [resultadoCliente]: any = await pool.query(
+      const [resultadoCliente] = await pool.query<ResultSetHeader>(
         `
         INSERT INTO clientes (
           nombre_completo,
@@ -194,7 +215,7 @@ export async function POST(request: Request) {
       clienteId = resultadoCliente.insertId;
     }
 
-    const [resultadoCita]: any = await pool.query(
+    const [resultadoCita] = await pool.query<ResultSetHeader>(
       `
       INSERT INTO citas (
         cliente_id,
@@ -249,9 +270,12 @@ export async function GET(request: Request) {
     // =====================================================
 
     if (fecha) {
-      const [citas]: any = await pool.query(
+      // Consulta pública del calendario: se exponen
+      // únicamente hora y duración. Los ids internos
+      // de cita NO se exponen al público.
+      const [citas] = await pool.query<RowDataPacket[]>(
         `
-        SELECT c.id, c.hora, s.duracion_minutos
+        SELECT c.hora, s.duracion_minutos
         FROM citas c
         INNER JOIN servicios s ON c.servicio_id = s.id
         WHERE c.fecha = ?
@@ -278,7 +302,7 @@ export async function GET(request: Request) {
       );
     }
 
-    const [citas]: any = await pool.query(
+    const [citas] = await pool.query<RowDataPacket[]>(
       `
       SELECT
         c.id,
@@ -369,7 +393,7 @@ export async function PATCH(request: Request) {
     // OBTENER INFORMACIÓN DE LA CITA
     // =====================================================
 
-    const [citas]: any = await pool.query(
+    const [citas] = await pool.query<RowDataPacket[]>(
       `
       SELECT
         c.id,
@@ -416,7 +440,7 @@ export async function PATCH(request: Request) {
         );
       }
 
-      const [resultado]: any = await pool.query(
+      const [resultado] = await pool.query<ResultSetHeader>(
         `
         UPDATE citas
         SET
@@ -478,7 +502,7 @@ export async function PATCH(request: Request) {
       // VERIFICAR DISPONIBILIDAD
       // ===================================================
 
-      const [citasOcupadas]: any = await pool.query(
+      const [citasOcupadas] = await pool.query<RowDataPacket[]>(
         `
         SELECT id
         FROM citas
@@ -521,8 +545,8 @@ export async function PATCH(request: Request) {
       // OBTENER LA CITA ACTUALIZADA
       // ===================================================
 
-      const [citaActualizadaRows]: any =
-        await pool.query(
+      const [citaActualizadaRows] =
+        await pool.query<RowDataPacket[]>(
           `
           SELECT
             c.id,
@@ -732,7 +756,7 @@ export async function PATCH(request: Request) {
     // ACTUALIZAR ESTADO
     // =====================================================
 
-    const [resultadoActualizacion]: any = await pool.query(
+    const [resultadoActualizacion] = await pool.query<ResultSetHeader>(
       `
       UPDATE citas
       SET
@@ -832,10 +856,7 @@ export async function PATCH(request: Request) {
 
                 <div style="text-align:center;margin-top:30px;">
                   <a
-                    href="${
-                      process.env.APP_URL ||
-                      "http://localhost:3000"
-                    }/agendar"
+                    href="${obtenerAppUrl()}/agendar"
                     style="display:inline-block;background:#C56835;color:white;text-decoration:none;padding:14px 26px;border-radius:30px;font-weight:bold;"
                   >
                     Agendar nueva cita

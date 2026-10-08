@@ -64,8 +64,6 @@ export default function BlogAdmin() {
 
   async function cargarPublicaciones() {
     try {
-      setCargando(true);
-
       const respuesta = await fetch(
         "/api/publicaciones?admin=true",
         {
@@ -97,7 +95,40 @@ export default function BlogAdmin() {
   }
 
   useEffect(() => {
-    cargarPublicaciones();
+    let activa = true;
+
+    void fetch("/api/publicaciones?admin=true", {
+      cache: "no-store",
+    })
+      .then(async (respuesta) => {
+        const datos = await respuesta.json();
+
+        if (!respuesta.ok) {
+          throw new Error(
+            datos.error || "No se pudieron cargar las publicaciones."
+          );
+        }
+
+        if (activa) setPublicaciones(datos);
+      })
+      .catch((error: unknown) => {
+        if (!activa) return;
+
+        console.error(error);
+        mostrarMensaje(
+          error instanceof Error
+            ? error.message
+            : "No se pudieron cargar las publicaciones.",
+          "error"
+        );
+      })
+      .finally(() => {
+        if (activa) setCargando(false);
+      });
+
+    return () => {
+      activa = false;
+    };
   }, []);
 
   // ======================================================
@@ -312,6 +343,8 @@ export default function BlogAdmin() {
       setArchivoImagen(null);
       setVistaPreviaImagen("");
 
+      setCargando(true);
+
       await cargarPublicaciones();
     } catch (error) {
       console.error(error);
@@ -380,6 +413,8 @@ export default function BlogAdmin() {
 
       cancelarEliminacion();
 
+      setCargando(true);
+
       await cargarPublicaciones();
     } catch (error) {
       console.error(error);
@@ -441,6 +476,8 @@ export default function BlogAdmin() {
           : "Publicación guardada como borrador.",
         "exito"
       );
+
+      setCargando(true);
 
       await cargarPublicaciones();
     } catch (error) {

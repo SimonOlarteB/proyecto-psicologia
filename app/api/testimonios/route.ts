@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import type { ResultSetHeader } from "mysql2";
 import pool from "../../lib/db";
 import { verificarSesion } from "../../lib/auth";
 
@@ -137,7 +138,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const [resultado]: any = await pool.query(
+    const [resultado] = await pool.query<ResultSetHeader>(
       `
       INSERT INTO testimonios (
         nombre,
@@ -229,7 +230,7 @@ export async function PUT(request: Request) {
       );
     }
 
-    const [resultado]: any = await pool.query(
+    const [resultado] = await pool.query<ResultSetHeader>(
       `
       UPDATE testimonios
       SET
@@ -310,7 +311,7 @@ export async function DELETE(request: Request) {
     // Se pide explícitamente con accion: "borrar"; si no se envía,
     // se mantiene el comportamiento de siempre (solo lo retira).
     if (accion === "borrar") {
-      const [resultadoBorrado]: any = await pool.query(
+      const [resultadoBorrado] = await pool.query<ResultSetHeader>(
         `
         DELETE FROM testimonios
         WHERE id = ?
@@ -333,7 +334,7 @@ export async function DELETE(request: Request) {
       });
     }
 
-    const [resultado]: any = await pool.query(
+    const [resultado] = await pool.query<ResultSetHeader>(
       `
       UPDATE testimonios
       SET publicado = 0

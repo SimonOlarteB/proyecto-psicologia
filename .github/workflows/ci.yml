@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  construir:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      # next build no requiere base de datos:
+      # las páginas dinámicas no se prerenderizan
+      # y db.ts omite la validación en fase de build.
+      - name: Build
+        run: npm run build
+        env:
+          NODE_ENV: production

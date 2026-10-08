@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import Link from "next/link";
 
 export default function LoginPage() {
     const [email, setEmail] = useState("");
@@ -186,12 +187,12 @@ export default function LoginPage() {
 
                     {/* VOLVER AL SITIO */}
                     <div className="mt-6 text-center">
-                        <a
+                        <Link
                             href="/"
                             className="text-sm text-[#707469] transition hover:text-[#C56835]"
                         >
                             ← Volver al sitio web
-                        </a>
+                        </Link>
                     </div>
 
                     <p className="mt-8 text-center text-xs leading-5 text-[#92948D]">

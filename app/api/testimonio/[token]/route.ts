@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import type { ResultSetHeader } from "mysql2";
 import pool from "@/app/lib/db";
 import { obtenerSolicitudValidada } from "@/app/lib/testimonio";
  
@@ -94,7 +95,7 @@ export async function POST(
     // Si dos pestañas envían el formulario al mismo tiempo,
     // solo una va a lograr este UPDATE — evita testimonios
     // duplicados por una misma invitación.
-    const [actualizacion]: any = await pool.query(
+    const [actualizacion] = await pool.query<ResultSetHeader>(
       `
         UPDATE solicitudes_testimonio
         SET estado = 'RESPONDIDA',

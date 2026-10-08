@@ -1,5 +1,6 @@
  import { NextResponse } from "next/server";
         import crypto from "crypto";
+        import type { RowDataPacket, ResultSetHeader } from "mysql2";
         import pool from "@/app/lib/db";
         import { enviarCorreo } from "@/app/lib/email";
 
@@ -86,7 +87,7 @@
             );
             }
 
-            const [filas]: any = await pool.query(
+            const [filas] = await pool.query<RowDataPacket[]>(
             `
                 SELECT
                 c.id,
@@ -173,7 +174,7 @@
 
             // Actualizar solamente si aún no se ha confirmado.
             // El estado de la cita permanece CONFIRMADA.
-            const [resultado]: any = await pool.query(
+            const [resultado] = await pool.query<ResultSetHeader>(
             `
                 UPDATE citas
                 SET asistencia_confirmada = 1

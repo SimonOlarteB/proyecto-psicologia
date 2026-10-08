@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import type { ResultSetHeader } from "mysql2";
 import pool from "@/app/lib/db";
 import { enviarCorreo } from "@/app/lib/email";
 import { obtenerHorasDisponibles } from "@/app/lib/disponibilidad";
@@ -81,7 +82,7 @@ export async function POST(
  
     // Se reinician confirmación y recordatorio para la nueva fecha,
     // y se invalida el token del correo anterior.
-    const [actualizacion]: any = await pool.query(
+    const [actualizacion] = await pool.query<ResultSetHeader>(
       `
         UPDATE citas
         SET fecha = ?,

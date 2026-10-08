@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import crypto from "crypto";
 import { google } from "googleapis";
 import { verificarSesion } from "../../../lib/auth";
-export async function GET(request: Request) {
+export async function GET() {
   try {
     // =====================================================
     // VERIFICAR SESIÓN DEL ADMINISTRADOR

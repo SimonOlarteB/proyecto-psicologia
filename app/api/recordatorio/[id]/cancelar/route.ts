@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import type { ResultSetHeader } from "mysql2";
 import pool from "@/app/lib/db";
 import { enviarCorreo } from "@/app/lib/email";
 import {
@@ -35,7 +36,7 @@ export async function POST(
  
     // Cancelar solo si sigue CONFIRMADA (evita doble cancelación).
     // Se invalida el token para que el enlace no se pueda reutilizar.
-    const [actualizacion]: any = await pool.query(
+    const [actualizacion] = await pool.query<ResultSetHeader>(
       `
         UPDATE citas
         SET estado = 'CANCELADA',

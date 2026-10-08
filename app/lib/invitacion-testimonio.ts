@@ -1,4 +1,5 @@
 import { randomBytes, createHash } from "crypto";
+import type { RowDataPacket } from "mysql2";
 import pool from "./db";
 import { enviarCorreo } from "./email";
 
@@ -66,7 +67,7 @@ export async function enviarInvitacionTestimonio(
     };
   }
 
-  const [filas]: any = await pool.query(
+  const [filas] = await pool.query<RowDataPacket[]>(
     `
       SELECT
         c.id AS cita_id,
@@ -124,8 +125,11 @@ export async function enviarInvitacionTestimonio(
       `,
       [cita.cita_id, tokenHash]
     );
-  } catch (error: any) {
-    if (error?.code === "ER_DUP_ENTRY") {
+  } catch (error: unknown) {
+    if (
+      (error as { code?: string })?.code ===
+      "ER_DUP_ENTRY"
+    ) {
       return { enviada: false, motivo: "ya_existe" };
     }
     throw error;
@@ -189,7 +193,7 @@ export async function enviarInvitacionTestimonio(
       asunto: "Nos gustaría conocer tu experiencia",
       html,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     await pool.query(
       `
         UPDATE solicitudes_testimonio
@@ -197,7 +201,10 @@ export async function enviarInvitacionTestimonio(
         WHERE cita_id = ? AND estado = 'PENDIENTE'
       `,
       [
-        String(error?.message || "Error al enviar el correo.").slice(0, 1000),
+        String(
+          (error as { message?: string })?.message ||
+            "Error al enviar el correo."
+        ).slice(0, 1000),
         cita.cita_id,
       ]
     );

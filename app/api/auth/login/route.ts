@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
+import type { RowDataPacket } from "mysql2";
 import pool from "../../../lib/db";
+import {
+  ipDelCliente,
+  permitirIntento,
+} from "../../../lib/rate-limit";
 
 function verificarPassword(password: string, passwordGuardada: string) {
     const partes = passwordGuardada.split(":");
@@ -61,6 +66,19 @@ function crearTokenSesion(id: number, debeCambiarPassword: boolean) {
 
 export async function POST(request: NextRequest) {
     try {
+        // Protección contra fuerza bruta:
+        // 10 intentos por IP cada 15 minutos.
+        const ip = ipDelCliente(request);
+
+        if (!permitirIntento(`login:${ip}`, 10, 15 * 60 * 1000)) {
+            return NextResponse.json(
+                {
+                    error: "Demasiados intentos. Inténtalo en unos minutos.",
+                },
+                { status: 429 }
+            );
+        }
+
         const body = await request.json();
 
         const email = String(body.email || "")
@@ -78,7 +96,7 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        const [filas] = await pool.query(
+        const [filas] = await pool.query<RowDataPacket[]>(
             `
             SELECT
                 id,
@@ -93,7 +111,7 @@ export async function POST(request: NextRequest) {
             [email]
         );
 
-        const administradores = filas as any[];
+        const administradores = filas;
 
         if (administradores.length === 0) {
             return NextResponse.json(

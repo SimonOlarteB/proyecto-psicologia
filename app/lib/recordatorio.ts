@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import type { RowDataPacket } from "mysql2";
 import pool from "@/app/lib/db";
 
 // ======================================================
@@ -112,7 +113,7 @@ export async function obtenerCitaValidada(
     return { ok: false, error: "El enlace no es válido.", status: 400 };
   }
 
-  const [filas]: any = await pool.query(
+  const [filas] = await pool.query<RowDataPacket[]>(
     `
       SELECT
         c.id,
@@ -171,7 +172,10 @@ export async function obtenerCitaValidada(
     };
   }
 
-  const { token_confirmacion: _omitido, ...cita } = fila;
+  // Se quita token_confirmacion del objeto
+  // que se devuelve (no debe salir de aquí).
+  const cita = { ...fila };
+  delete cita.token_confirmacion;
   return { ok: true, cita: cita as CitaRecordatorio };
 }
 

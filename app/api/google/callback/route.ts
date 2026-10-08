@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { google } from "googleapis";
+import type { RowDataPacket } from "mysql2";
 import pool from "./../../../lib/db";
+import { cifrarToken } from "./../../../lib/seguridad-tokens";
 
 export async function GET(request: Request) {
   try {
@@ -126,8 +128,8 @@ const emailGoogle = "Cuenta Google";
     // GUARDAR CONEXIÓN EN MYSQL
     // =====================================================
 
-    const [configuracionExistente]: any =
-      await pool.query(
+    const [configuracionExistente] =
+      await pool.query<RowDataPacket[]>(
         `
         SELECT id
         FROM google_calendar_config
@@ -148,7 +150,8 @@ const emailGoogle = "Cuenta Google";
         `,
         [
           emailGoogle,
-          tokens.refresh_token,
+          // Se guarda cifrado en reposo (AES-256-GCM).
+          cifrarToken(tokens.refresh_token),
           calendarId,
           configuracionExistente[0].id,
         ]
@@ -166,7 +169,7 @@ const emailGoogle = "Cuenta Google";
         `,
         [
           emailGoogle,
-          tokens.refresh_token,
+          cifrarToken(tokens.refresh_token),
           calendarId,
         ]
       );

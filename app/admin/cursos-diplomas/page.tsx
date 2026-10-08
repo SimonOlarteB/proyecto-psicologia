@@ -378,7 +378,7 @@ export default function CursosDiplomasPage() {
         return "bg-[#E1DBD2] text-[#59614D]";
     }
 
-    function ListaFormacion({
+    function renderListaFormacion({
         titulo,
         subtitulo,
         items,
@@ -614,23 +614,23 @@ export default function CursosDiplomasPage() {
 
                         <div className="space-y-6">
 
-                            <ListaFormacion
-                                titulo="Cursos"
-                                subtitulo="Cursos y formaciones complementarias."
-                                items={cursos}
-                            />
+                            {renderListaFormacion({
+                                titulo: "Cursos",
+                                subtitulo: "Cursos y formaciones complementarias.",
+                                items: cursos,
+                            })}
 
-                            <ListaFormacion
-                                titulo="Diplomados"
-                                subtitulo="Diplomados y programas de especialización."
-                                items={diplomados}
-                            />
+                            {renderListaFormacion({
+                                titulo: "Diplomados",
+                                subtitulo: "Diplomados y programas de especialización.",
+                                items: diplomados,
+                            })}
 
-                            <ListaFormacion
-                                titulo="Certificaciones"
-                                subtitulo="Certificaciones y acreditaciones profesionales."
-                                items={certificaciones}
-                            />
+                            {renderListaFormacion({
+                                titulo: "Certificaciones",
+                                subtitulo: "Certificaciones y acreditaciones profesionales.",
+                                items: certificaciones,
+                            })}
 
                         </div>
 

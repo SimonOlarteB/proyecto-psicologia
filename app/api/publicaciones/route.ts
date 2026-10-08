@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import type { ResultSetHeader } from "mysql2";
 import pool from "../../lib/db";
 import { verificarSesion } from "../../lib/auth";
 
@@ -132,7 +133,7 @@ export async function POST(request: Request) {
       fechaFinal = fecha_publicacion || new Date();
     }
 
-    const [resultado]: any = await pool.query(
+    const [resultado] = await pool.query<ResultSetHeader>(
       `
       INSERT INTO publicaciones (
         titulo,
@@ -233,7 +234,7 @@ export async function PUT(request: Request) {
       fechaFinal = null;
     }
 
-    const [resultado]: any = await pool.query(
+    const [resultado] = await pool.query<ResultSetHeader>(
       `
       UPDATE publicaciones
       SET
@@ -309,7 +310,7 @@ export async function DELETE(request: Request) {
       );
     }
 
-    const [resultado]: any = await pool.query(
+    const [resultado] = await pool.query<ResultSetHeader>(
       `
       DELETE FROM publicaciones
       WHERE id = ?

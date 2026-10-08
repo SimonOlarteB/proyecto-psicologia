@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
+import type { RowDataPacket } from "mysql2";
 import pool from "../../../lib/db";
 
 function verificarPassword(
@@ -196,7 +197,7 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        const [filas] = await pool.query(
+        const [filas] = await pool.query<RowDataPacket[]>(
             `
             SELECT
                 id,
@@ -209,7 +210,7 @@ export async function POST(request: NextRequest) {
             [sesion.id]
         );
 
-        const administradores = filas as any[];
+        const administradores = filas;
 
         if (administradores.length === 0) {
             return NextResponse.json(

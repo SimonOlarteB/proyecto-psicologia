@@ -1,9 +1,19 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import crypto from "crypto";
+import type { ResultSetHeader, RowDataPacket } from "mysql2";
 import pool from "./../../lib/db";
 import { verificarSesion } from "./../../lib/auth";
 import { horariosSeCruzan } from "./../../lib/horarios";
+import {
+  ipDelCliente,
+  permitirIntento,
+} from "./../../lib/rate-limit";
+
+type CitaOcupada = RowDataPacket & {
+  hora: string;
+  duracion_minutos: number;
+};
 
 async function obtenerSesionAdmin() {
   const cookieStore = await cookies();
@@ -70,7 +80,7 @@ export async function GET(request: Request) {
         ON c.servicio_id = s.id
     `;
 
-    const parametros: any[] = [];
+    const parametros: string[] = [];
 
     if (
       estado &&
@@ -91,7 +101,7 @@ export async function GET(request: Request) {
         p.id DESC
     `;
 
-    const [pagos]: any = await pool.query(
+    const [pagos] = await pool.query<RowDataPacket[]>(
       consulta,
       parametros
     );
@@ -119,6 +129,20 @@ export async function POST(request: Request) {
   const conexion = await pool.getConnection();
 
   try {
+    // Protección contra abuso de pagos:
+    // 20 solicitudes por IP cada hora.
+    const ip = ipDelCliente(request);
+
+    if (!permitirIntento(`pagos:${ip}`, 20, 60 * 60 * 1000)) {
+      // El finally libera la conexión.
+      return NextResponse.json(
+        {
+          error: "Demasiadas solicitudes. Inténtalo en unos minutos.",
+        },
+        { status: 429 }
+      );
+    }
+
     const datos = await request.json();
 
     const {
@@ -191,7 +215,7 @@ export async function POST(request: Request) {
     // SERVICIO
     // ====================================================
 
-    const [servicios]: any = await conexion.query(
+    const [servicios] = await conexion.query<RowDataPacket[]>(
       `
       SELECT
         id,
@@ -252,8 +276,8 @@ export async function POST(request: Request) {
     // VALIDAR HORARIO
     // ====================================================
 
-    const [citasExistentes]: any =
-      await conexion.query(
+    const [citasExistentes] =
+      await conexion.query<CitaOcupada[]>(
         `
         SELECT c.hora, s.duracion_minutos
         FROM citas c
@@ -264,10 +288,7 @@ export async function POST(request: Request) {
         [fecha]
       );
 
-    const hayCruce = citasExistentes.some((cita: {
-      hora: string;
-      duracion_minutos: number;
-    }) =>
+    const hayCruce = citasExistentes.some((cita) =>
       horariosSeCruzan(
         hora,
         Number(servicio.duracion_minutos),
@@ -286,7 +307,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const [bloqueos]: any = await conexion.query(
+    const [bloqueos] = await conexion.query<RowDataPacket[]>(
       `
       SELECT id
       FROM bloqueos_agenda
@@ -367,7 +388,7 @@ export async function POST(request: Request) {
     // BUSCAR CLIENTE
     // ====================================================
 
-    const [clientes]: any = await conexion.query(
+    const [clientes] = await conexion.query<RowDataPacket[]>(
       `
       SELECT id
       FROM clientes
@@ -399,8 +420,8 @@ export async function POST(request: Request) {
         ]
       );
     } else {
-      const [resultadoCliente]: any =
-        await conexion.query(
+      const [resultadoCliente] =
+        await conexion.query<ResultSetHeader>(
           `
           INSERT INTO clientes (
             nombre_completo,
@@ -425,8 +446,8 @@ export async function POST(request: Request) {
     // CREAR CITA
     // ====================================================
 
-    const [resultadoCita]: any =
-      await conexion.query(
+    const [resultadoCita] =
+      await conexion.query<ResultSetHeader>(
         `
         INSERT INTO citas (
           cliente_id,

@@ -1,58 +1,41 @@
 import ScrollToTop from "./ScrollToTop";
+import Link from "next/link";
 import { formatearDuracion } from "./lib/duracion";
+import {
+  obtenerPerfilPublico,
+  obtenerPublicacionesPublicas,
+  obtenerServiciosPublicos,
+  obtenerTestimoniosPublicos,
+  obtenerTrayectoriaPublica,
+  type PublicacionPublica,
+} from "./lib/contenido-publico";
 
-interface PublicacionBlog {
-  id: number;
-  titulo: string;
-  resumen: string | null;
-  contenido: string;
-  imagen_url: string | null;
-}
+export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  const [
-    respuestaServicios,
-    respuestaPerfil,
-    respuestaTrayectoria,
-    respuestaTestimonios,
-    respuestaPublicaciones,
-  ] = await Promise.all([
-    fetch("http://localhost:3000/api/servicios", {
-      cache: "no-store",
-    }),
-    fetch("http://localhost:3000/api/perfil", {
-      cache: "no-store",
-    }),
-    fetch("http://localhost:3000/api/trayectoria", {
-      cache: "no-store",
-    }),
-    fetch("http://localhost:3000/api/testimonios", {
-      cache: "no-store",
-    }),
-    fetch("http://localhost:3000/api/publicaciones", {
-      cache: "no-store",
-    }),
-  ]);
+  let servicios: Awaited<ReturnType<typeof obtenerServiciosPublicos>> = [];
+  let perfil: Awaited<ReturnType<typeof obtenerPerfilPublico>> | null = null;
+  let trayectoria: Awaited<ReturnType<typeof obtenerTrayectoriaPublica>> = [];
+  let testimonios: Awaited<ReturnType<typeof obtenerTestimoniosPublicos>> = [];
+  let publicaciones: PublicacionPublica[] = [];
 
-  const servicios = respuestaServicios.ok
-    ? await respuestaServicios.json()
-    : [];
+  try {
+    const resultado = await Promise.all([
+      obtenerServiciosPublicos(),
+      obtenerPerfilPublico(),
+      obtenerTrayectoriaPublica(),
+      obtenerTestimoniosPublicos(),
+      obtenerPublicacionesPublicas(),
+    ]);
 
-  const perfil = respuestaPerfil.ok
-    ? await respuestaPerfil.json()
-    : null;
-
-  const trayectoria = respuestaTrayectoria.ok
-    ? await respuestaTrayectoria.json()
-    : [];
-
-  const testimonios = respuestaTestimonios.ok
-    ? await respuestaTestimonios.json()
-    : [];
-
-  const publicaciones: PublicacionBlog[] = respuestaPublicaciones.ok
-    ? await respuestaPublicaciones.json()
-    : [];
+    servicios = resultado[0];
+    perfil = resultado[1];
+    trayectoria = resultado[2];
+    testimonios = resultado[3];
+    publicaciones = resultado[4];
+  } catch (error) {
+    console.error("Error cargando la página de inicio:", error);
+  }
 
   const nombreProfesional =
     perfil?.nombre_profesional || "Aura Elisa Sánchez";
@@ -150,12 +133,12 @@ export default async function Home() {
             >
               Testimonios
             </a>
-            <a
+            <Link
   href="/blog"
   className="text-sm hover:text-[#C56835]"
 >
   Blog
-</a>
+</Link>
 
             <a
               href="#contacto"
@@ -363,8 +346,8 @@ export default async function Home() {
           <div className="mt-14 grid gap-6 md:grid-cols-2">
 
             {servicios
-              .filter((servicio: any) => servicio.activo)
-              .map((servicio: any) => (
+              .filter((servicio) => servicio.activo)
+              .map((servicio) => (
 
                 <div
                   key={servicio.id}
@@ -457,7 +440,7 @@ export default async function Home() {
           </div>
 
           <div className="mt-14 grid gap-5 sm:grid-cols-2">
-            {trayectoria.map((elemento: any) => {
+            {trayectoria.map((elemento) => {
               const imagenValida = elemento.imagen_url && (String(elemento.imagen_url).startsWith("http://") || String(elemento.imagen_url).startsWith("https://") || String(elemento.imagen_url).startsWith("/"));
               const tipo = elemento.tipo === "TITULO" ? "Título" : elemento.tipo === "CURSO" ? "Curso" : elemento.tipo === "DIPLOMADO" ? "Diplomado" : "Certificación";
               const modalId = `diploma-${elemento.id}`;
@@ -504,7 +487,7 @@ export default async function Home() {
             <p className="font-serif text-lg italic text-[#62675B]">La formación constante permite ofrecer un acompañamiento más humano y profesional.</p>
           </div>
 
-          {trayectoria.map((elemento: any) => {
+          {trayectoria.map((elemento) => {
             const imagenValida = elemento.imagen_url && (String(elemento.imagen_url).startsWith("http://") || String(elemento.imagen_url).startsWith("https://") || String(elemento.imagen_url).startsWith("/"));
             if (!imagenValida) return null;
             const modalId = `diploma-${elemento.id}`;
@@ -561,7 +544,7 @@ export default async function Home() {
 
             <div className="mt-12 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
 
-              {testimonios.map((testimonio: any) => (
+              {testimonios.map((testimonio) => (
 
                 <article
                   key={testimonio.id}
@@ -675,7 +658,7 @@ export default async function Home() {
             </div>
             <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
               {publicaciones.slice(0, 3).map((publicacion) => (
-                <a key={publicacion.id} href={`/blog/${publicacion.id}`} className="group overflow-hidden rounded-2xl border border-[#E7E0D7] bg-white transition hover:-translate-y-1 hover:shadow-lg">
+                <Link key={publicacion.id} href={`/blog/${publicacion.id}`} className="group overflow-hidden rounded-2xl border border-[#E7E0D7] bg-white transition hover:-translate-y-1 hover:shadow-lg">
                   {publicacion.imagen_url ? (
                     <img src={publicacion.imagen_url} alt={publicacion.titulo} className="h-36 w-full object-cover" />
                   ) : (
@@ -690,16 +673,16 @@ export default async function Home() {
                     </p>
                     <span className="mt-4 inline-block text-sm font-medium text-[#B95B32]">Leer más →</span>
                   </div>
-                </a>
+                </Link>
               ))}
             </div>
             <div className="mt-8 flex justify-center">
-              <a
+              <Link
                 href="/blog"
                 className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-[#C56835] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#AD542B]"
               >
                 Explorar el blog <span aria-hidden="true">→</span>
-              </a>
+              </Link>
             </div>
           </div>
         </section>

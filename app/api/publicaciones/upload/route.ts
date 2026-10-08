@@ -1,10 +1,8 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { mkdir, writeFile } from "fs/promises";
-import path from "path";
-import crypto from "crypto";
 
 import { verificarSesion } from "../../../lib/auth";
+import { guardarImagenSubida } from "../../../lib/uploads";
 
 export const runtime = "nodejs";
 
@@ -52,30 +50,11 @@ export async function POST(request: Request) {
       );
     }
 
-    const extensiones: Record<string, string> = {
-      "image/jpeg": "jpg",
-      "image/png": "png",
-      "image/webp": "webp",
-    };
-    const nombreArchivo = `${crypto.randomUUID()}.${extensiones[archivo.type]}`;
-    const carpeta = path.join(
-      process.cwd(),
-      "public",
-      "uploads",
-      "blog"
-    );
-
-    await mkdir(carpeta, { recursive: true });
-
-    const bytes = await archivo.arrayBuffer();
-    await writeFile(
-      path.join(carpeta, nombreArchivo),
-      Buffer.from(bytes)
-    );
+    const { url } = await guardarImagenSubida("blog", archivo);
 
     return NextResponse.json({
       ok: true,
-      url: `/uploads/blog/${nombreArchivo}`,
+      url,
     });
   } catch (error) {
     console.error("Error subiendo imagen del Blog:", error);
