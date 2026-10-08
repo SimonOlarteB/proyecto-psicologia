@@ -92,6 +92,10 @@ export default function AdminPage() {
         void fetch("/api/citas")
             .then(async (respuesta) => {
                 if (!respuesta.ok) {
+                    if (respuesta.status === 401 || respuesta.status === 403) {
+                        window.location.href = "/login?next=/admin";
+                        return;
+                    }
                     throw new Error("No se pudieron cargar las citas");
                 }
 

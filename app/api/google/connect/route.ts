@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import crypto from "crypto";
 import { google } from "googleapis";
 import { verificarSesion } from "../../../lib/auth";
-export async function GET() {
+export async function GET(request: Request) {
   try {
     // =====================================================
     // VERIFICAR SESIÓN DEL ADMINISTRADOR
@@ -15,14 +15,9 @@ export async function GET() {
     const sesion = verificarSesion(token);
 
     if (!sesion) {
-      return NextResponse.json(
-        {
-          error: "No autorizado.",
-        },
-        {
-          status: 401,
-        }
-      );
+      const loginUrl = new URL("/login", request.url);
+      loginUrl.searchParams.set("next", "/api/google/connect");
+      return NextResponse.redirect(loginUrl.toString());
     }
 
     // =====================================================

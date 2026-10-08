@@ -97,10 +97,20 @@ function compararFirmas(
 
 function formatearFecha(fecha: string | Date): string {
   try {
-    const fechaObjeto =
-      fecha instanceof Date
-        ? fecha
-        : new Date(fecha);
+    let fechaObjeto: Date;
+
+    if (fecha instanceof Date) {
+      fechaObjeto = fecha;
+    } else {
+      const valor = String(fecha).trim();
+
+      if (/^\d{4}-\d{2}-\d{2}$/.test(valor)) {
+        const [anio, mes, dia] = valor.split("-").map(Number);
+        fechaObjeto = new Date(anio, mes - 1, dia);
+      } else {
+        fechaObjeto = new Date(valor);
+      }
+    }
 
     return new Intl.DateTimeFormat("es-CO", {
       dateStyle: "full",

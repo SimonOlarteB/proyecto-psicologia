@@ -180,7 +180,7 @@ const emailGoogle = "Cuenta Google";
     // =====================================================
 
     const respuesta = NextResponse.redirect(
-      new URL("/login", request.url)
+      new URL("/admin", request.url)
     );
 
     respuesta.cookies.delete("google_oauth_state");

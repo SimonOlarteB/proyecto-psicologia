@@ -1,9 +1,12 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, Suspense, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 
-export default function LoginPage() {
+function LoginPageContent() {
+    const searchParams = useSearchParams();
+    const destino = searchParams.get("next") || "/admin";
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [mostrarPassword, setMostrarPassword] = useState(false);
@@ -53,7 +56,8 @@ export default function LoginPage() {
             return;
         }
 
-        window.location.href = "/admin";
+        const destinoFinal = destino.startsWith("/") ? destino : "/admin";
+        window.location.href = destinoFinal;
     } catch (error) {
         console.error("Error iniciando sesión:", error);
         setError(
@@ -202,5 +206,13 @@ export default function LoginPage() {
                 </section>
             </div>
         </main>
+    );
+}
+
+export default function LoginPage() {
+    return (
+        <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-[#3F4635]">Cargando...</div>}>
+            <LoginPageContent />
+        </Suspense>
     );
 }
