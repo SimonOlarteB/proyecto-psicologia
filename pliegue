@@ -1,0 +1,3837 @@
+[1mdiff --git a/.dockerignore b/.dockerignore[m
+[1mnew file mode 100644[m
+[1mindex 0000000..3f31b00[m
+[1m--- /dev/null[m
+[1m+++ b/.dockerignore[m
+[36m@@ -0,0 +1,9 @@[m
+[32m+[m[32mnode_modules[m
+[32m+[m[32m.next[m
+[32m+[m[32m.git[m
+[32m+[m[32m.env*[m
+[32m+[m[32m!.env.example[m
+[32m+[m[32mpublic/uploads[m
+[32m+[m[32mrespaldos[m
+[32m+[m[32mDockerfile[m
+[32m+[m[32m.dockerignore[m
+[1mdiff --git a/.env.example b/.env.example[m
+[1mnew file mode 100644[m
+[1mindex 0000000..5cd8959[m
+[1m--- /dev/null[m
+[1m+++ b/.env.example[m
+[36m@@ -0,0 +1,39 @@[m
+[32m+[m[32m# Copiar a .env y completar. Nunca commitear .env.[m
+[32m+[m
+[32m+[m[32mNODE_ENV=production[m
+[32m+[m[32mAPP_URL=https://tudominio.com[m
+[32m+[m
+[32m+[m[32m# Sesión admin (HMAC). Mínimo 32 caracteres aleatorios.[m
+[32m+[m[32mAUTH_SECRET=[m
+[32m+[m
+[32m+[m[32m# Cifrado de refresh tokens de Google. Si se omite, se usa AUTH_SECRET.[m
+[32m+[m[32m# TOKEN_ENCRYPTION_KEY=[m
+[32m+[m
+[32m+[m[32mDB_HOST=[m
+[32m+[m[32mDB_PORT=3306[m
+[32m+[m[32mDB_USER=[m
+[32m+[m[32mDB_PASSWORD=[m
+[32m+[m[32mDB_NAME=psicologia[m
+[32m+[m[32m# SSL obligatorio hacia MySQL gestionado. Nunca DB_USER=root en producción.[m
+[32m+[m[32mDB_SSL=true[m
+[32m+[m[32m# DB_SSL_REJECT_UNAUTHORIZED=true[m
+[32m+[m[32m# Ruta al PEM de la CA del proveedor (RDS, PlanetScale, etc.) si lo exige.[m
+[32m+[m[32m# DB_SSL_CA=/etc/ssl/certs/rds-ca-rsa2048-g1.pem[m
+[32m+[m[32mDB_CONNECTION_LIMIT=10[m
+[32m+[m
+[32m+[m[32m# Volumen persistente opcional. Por defecto: public/uploads[m
+[32m+[m[32m# UPLOAD_DIR=/var/lib/psicologia/uploads[m
+[32m+[m
+[32m+[m[32mWOMPI_PUBLIC_KEY=[m
+[32m+[m[32mWOMPI_INTEGRITY_SECRET=[m
+[32m+[m[32mWOMPI_EVENTS_SECRET=[m
+[32m+[m
+[32m+[m[32mRESEND_API_KEY=[m
+[32m+[m[32mRESEND_FROM_EMAIL=consultas@tudominio.com[m
+[32m+[m
+[32m+[m[32mGOOGLE_CLIENT_ID=[m
+[32m+[m[32mGOOGLE_CLIENT_SECRET=[m
+[32m+[m[32mGOOGLE_REDIRECT_URI=https://tudominio.com/api/google/callback[m
+[32m+[m
+[32m+[m[32m# Authorization: Bearer <CRON_SECRET>[m
+[32m+[m[32mCRON_SECRET=[m
+[1mdiff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml[m
+[1mnew file mode 100644[m
+[1mindex 0000000..cb9168e[m
+[1m--- /dev/null[m
+[1m+++ b/.github/workflows/ci.yml[m
+[36m@@ -0,0 +1,33 @@[m
+[32m+[m[32mname: CI[m
+[32m+[m
+[32m+[m[32mon:[m
+[32m+[m[32m  push:[m
+[32m+[m[32m    branches: [main][m
+[32m+[m[32m  pull_request:[m
+[32m+[m[32m    branches: [main][m
+[32m+[m
+[32m+[m[32mjobs:[m
+[32m+[m[32m  construir:[m
+[32m+[m[32m    runs-on: ubuntu-latest[m
+[32m+[m
+[32m+[m[32m    steps:[m
+[32m+[m[32m      - uses: actions/checkout@v4[m
+[32m+[m
+[32m+[m[32m      - uses: actions/setup-node@v4[m
+[32m+[m[32m        with:[m
+[32m+[m[32m          node-version: 20[m
+[32m+[m[32m          cache: npm[m
+[32m+[m
+[32m+[m[32m      - name: Instalar dependencias[m
+[32m+[m[32m        run: npm ci[m
+[32m+[m
+[32m+[m[32m      - name: Lint[m
+[32m+[m[32m        run: npm run lint[m
+[32m+[m
+[32m+[m[32m      # next build no requiere base de datos:[m
+[32m+[m[32m      # las páginas dinámicas no se prerenderizan[m
+[32m+[m[32m      # y db.ts omite la validación en fase de build.[m
+[32m+[m[32m      - name: Build[m
+[32m+[m[32m        run: npm run build[m
+[32m+[m[32m        env:[m
+[32m+[m[32m          NODE_ENV: production[m
+[1mdiff --git a/.github/workflows/cron.yml b/.github/workflows/cron.yml[m
+[1mnew file mode 100644[m
+[1mindex 0000000..e2dc4d5[m
+[1m--- /dev/null[m
+[1m+++ b/.github/workflows/cron.yml[m
+[36m@@ -0,0 +1,34 @@[m
+[32m+[m[32m# Crons de la aplicación.[m
+[32m+[m[32m#[m
+[32m+[m[32m# Las rutas de recordatorios exigen[m
+[32m+[m[32m# Authorization: Bearer <CRON_SECRET>, header que[m
+[32m+[m[32m# Vercel crons no puede enviar. Por eso se usan[m
+[32m+[m[32m# GitHub Actions (o crontab del VPS, ver README).[m
+[32m+[m[32m#[m
+[32m+[m[32m# Variables a configurar en el reposacio (secrets):[m
+[32m+[m[32m#   APP_URL     https://tudominio.com[m
+[32m+[m[32m#   CRON_SECRET valor compartido con la app[m
+[32m+[m
+[32m+[m[32mname: Cron — recordatorios[m
+[32m+[m
+[32m+[m[32mon:[m
+[32m+[m[32m  schedule:[m
+[32m+[m[32m    - cron: "*/15 * * * *"[m
+[32m+[m[32m  workflow_dispatch:[m
+[32m+[m
+[32m+[m[32mjobs:[m
+[32m+[m[32m  recordatorios:[m
+[32m+[m[32m    runs-on: ubuntu-latest[m
+[32m+[m
+[32m+[m[32m    steps:[m
+[32m+[m[32m      - name: Recordatorios de 12 horas[m
+[32m+[m[32m        run: |[m
+[32m+[m[32m          curl -fsS --max-time 300 \[m
+[32m+[m[32m            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \[m
+[32m+[m[32m            "${{ secrets.APP_URL }}/api/recordatorios/12-horas"[m
+[32m+[m
+[32m+[m[32m      - name: Recordatorios de testimonios[m
+[32m+[m[32m        run: |[m
+[32m+[m[32m          curl -fsS --max-time 300 \[m
+[32m+[m[32m            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \[m
+[32m+[m[32m            "${{ secrets.APP_URL }}/api/recordatorios/testimonios"[m
+[1mdiff --git a/.gitignore b/.gitignore[m
+[1mindex 5ef6a52..f8540f1 100644[m
+[1m--- a/.gitignore[m
+[1m+++ b/.gitignore[m
+[36m@@ -32,6 +32,11 @@[m [myarn-error.log*[m
+ [m
+ # env files (can opt-in for committing if needed)[m
+ .env*[m
+[32m+[m[32m!.env.example[m
+[32m+[m
+[32m+[m[32m# uploads persistentes del host; no versionar contenido[m
+[32m+[m[32m/public/uploads/**[m
+[32m+[m[32m!/public/uploads/.gitkeep[m
+ [m
+ # vercel[m
+ .vercel[m
+[1mdiff --git a/Dockerfile b/Dockerfile[m
+[1mnew file mode 100644[m
+[1mindex 0000000..d1f9958[m
+[1m--- /dev/null[m
+[1m+++ b/Dockerfile[m
+[36m@@ -0,0 +1,46 @@[m
+[32m+[m[32m# Imagen de producción para VPS / PaaS con Docker.[m
+[32m+[m[32m# Requiere: salida `standalone` (ya está en next.config.ts).[m
+[32m+[m
+[32m+[m[32mFROM node:20-alpine AS deps[m
+[32m+[m
+[32m+[m[32mWORKDIR /app[m
+[32m+[m
+[32m+[m[32mCOPY package.json package-lock.json ./[m
+[32m+[m[32mRUN npm ci --ignore-scripts[m
+[32m+[m
+[32m+[m[32mFROM node:20-alpine AS builder[m
+[32m+[m
+[32m+[m[32mWORKDIR /app[m
+[32m+[m
+[32m+[m[32mCOPY --from=deps /app/node_modules ./node_modules[m
+[32m+[m[32mCOPY . .[m
+[32m+[m
+[32m+[m[32m# El build no necesita base de datos ni secretos[m
+[32m+[m[32m# (las páginas son force-dynamic).[m
+[32m+[m[32mRUN npm run build[m
+[32m+[m
+[32m+[m[32mFROM node:20-alpine AS runner[m
+[32m+[m
+[32m+[m[32mWORKDIR /app[m
+[32m+[m
+[32m+[m[32mENV NODE_ENV=production[m
+[32m+[m[32mENV NEXT_TELEMETRY_DISABLED=1[m
+[32m+[m
+[32m+[m[32m# Usuario no root.[m
+[32m+[m[32mRUN addgroup --system --gid 1001 nodejs \[m
+[32m+[m[32m && adduser --system --uid 1001 nextjs[m
+[32m+[m
+[32m+[m[32mCOPY --from=builder /app/public ./public[m
+[32m+[m[32mCOPY --from=builder /app/.next/standalone ./[m
+[32m+[m[32mCOPY --from=builder /app/.next/static ./.next/static[m
+[32m+[m
+[32m+[m[32m# Volumen para las fotos de perfil/blog/trayectoria.[m
+[32m+[m[32m# Súbelo a un volumen persistente y apunta UPLOAD_DIR aquí.[m
+[32m+[m[32mRUN mkdir -p /app/public/uploads \[m
+[32m+[m[32m && chown -R nextjs:nodejs /app[m
+[32m+[m
+[32m+[m[32mUSER nextjs[m
+[32m+[m
+[32m+[m[32mEXPOSE 3000[m
+[32m+[m
+[32m+[m[32mCMD ["node", "server.js"][m
+[1mdiff --git a/README.md b/README.md[m
+[1mindex e215bc4..c623889 100644[m
+[1m--- a/README.md[m
+[1m+++ b/README.md[m
+[36m@@ -1,36 +1,113 @@[m
+[31m-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).[m
+[32m+[m[32m# Psicología — sitio y agenda[m
+ [m
+[31m-## Getting Started[m
+[32m+[m[32mAplicación de [Next.js](https://nextjs.org) 16 (App Router, React 19) para la práctica de psicología: agenda de citas con pagos Wompi, Google Calendar / Google Meet, correos con Resend, recordatorios automáticos y panel de administración.[m
+ [m
+[31m-First, run the development server:[m
+[32m+[m[32m- **Runtime:** Node.js 20+ (no es compatible con Edge por `mysql2`, `googleapis` y `fs`).[m
+[32m+[m[32m- **Base de datos:** MySQL 8 con `utf8mb4` (esquema en `schema/001_init.sql`).[m
+[32m+[m[32m- **Zona horaria de negocio:** `America/Bogota`.[m
+[32m+[m
+[32m+[m[32m## Desarrollo[m
+ [m
+ ```bash[m
+[32m+[m[32mnpm install[m
+[32m+[m[32mcp .env.example .env.local   # y completar[m
+ npm run dev[m
+[31m-# or[m
+[31m-yarn dev[m
+[31m-# or[m
+[31m-pnpm dev[m
+[31m-# or[m
+[31m-bun dev[m
+ ```[m
+ [m
+[31m-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.[m
+[32m+[m[32mAbrir http://localhost:3000. El esquema de la base se crea con:[m
+[32m+[m
+[32m+[m[32m```bash[m
+[32m+[m[32mmysql -u root -p < schema/001_init.sql[m
+[32m+[m[32mnode scripts/crear-admin.mjs[m
+[32m+[m[32m```[m
+[32m+[m
+[32m+[m[32m## Variables de entorno[m
+[32m+[m
+[32m+[m[32mTodas están documentadas en [`.env.example`](./.env.example). Las obligatorias en producción:[m
+[32m+[m
+[32m+[m[32m| Variable | Para qué sirve |[m
+[32m+[m[32m| --- | --- |[m
+[32m+[m[32m| `APP_URL` | URL pública HTTPS (correos, reprogramar, crons internos). |[m
+[32m+[m[32m| `AUTH_SECRET` | HMAC de la cookie de sesión admin. ≥ 32 bytes aleatorios. |[m
+[32m+[m[32m| `DB_HOST` / `DB_PORT` / `DB_USER` / `DB_PASSWORD` / `DB_NAME` | Conexión MySQL. **Nunca `root` en producción**; usa un usuario de aplicación con privilegios mínimos. |[m
+[32m+[m[32m| `DB_SSL` / `DB_SSL_CA` | SSL hacia el MySQL (obligatorio en cloud; `DB_SSL_CA` es la ruta al PEM del proveedor si lo exige). |[m
+[32m+[m[32m| `WOMPI_PUBLIC_KEY` / `WOMPI_INTEGRITY_SECRET` / `WOMPI_EVENTS_SECRET` | Checkout Wompi, firma de integridad y verificación del webhook. |[m
+[32m+[m[32m| `RESEND_API_KEY` / `RESEND_FROM_EMAIL` | Correos. Verifica tu dominio en Resend; no uses `onboarding@resend.dev` en producción. |[m
+[32m+[m[32m| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` / `GOOGLE_REDIRECT_URI` | OAuth de Google Calendar (`https://dominio/api/google/callback`). |[m
+[32m+[m[32m| `CRON_SECRET` | Bearer de los jobs de recordatorios. |[m
+[32m+[m[32m| `UPLOAD_DIR` | Opcional. Directorio persistente para fotos; por defecto `public/uploads`. |[m
+[32m+[m[32m| `TOKEN_ENCRYPTION_KEY` | Opcional. Cifrado del refresh_token de Google en reposo; si no se define se usa `AUTH_SECRET`. |[m
+[32m+[m
+[32m+[m[32m## Despliegue[m
+[32m+[m
+[32m+[m[32m**Forma recomendada:** VPS o PaaS con disco persistente y proceso Node largo (Railway, Render, Fly, DigitalOcean, o un VPS con Caddy/Nginx). Región cercana a Bogotá o São Paulo.[m
+[32m+[m
+[32m+[m[32mVercel solo si se cambia la arquitectura: el filesystem efímero rompe los uploads, el pool de MySQL y el webhook largo pelean con serverless.[m
+[32m+[m
+[32m+[m[32m### Pasos[m
+[32m+[m
+[32m+[m[32m1. **Base de datos** en el host: `mysql < schema/001_init.sql` con el usuario de aplicación.[m
+[32m+[m[32m2. **Secretos** del paso anterior en el panel del proveedor (nunca en el repo).[m
+[32m+[m[32m3. **Construir y arrancar:**[m
+[32m+[m
+[32m+[m[32m   ```bash[m
+[32m+[m[32m   npm ci[m
+[32m+[m[32m   npm run build[m
+[32m+[m[32m   npm start          # next start, puerto 3000[m
+[32m+[m[32m   ```[m
+[32m+[m
+[32m+[m[32m   O con Docker:[m
+[32m+[m
+[32m+[m[32m   ```bash[m
+[32m+[m[32m   docker build -t psicologia .[m
+[32m+[m[32m   docker run -p 3000:3000 --env-file .env.local \[m
+[32m+[m[32m     -v /var/lib/psicologia/uploads:/app/public/uploads \[m
+[32m+[m[32m     psicologia[m
+[32m+[m[32m   ```[m
+[32m+[m
+[32m+[m[32m4. **TLS** delante (HTTPS obligatorio: cookies `Secure`, HSTS y webhook de Wompi exigen HTTPS del dominio real).[m
+[32m+[m[32m5. **Webhook de Wompi:** configurar `https://tudominio.com/api/wompi/webhook` en el panel de Wompi.[m
+[32m+[m[32m6. **OAuth de Google:** `https://tudominio.com/api/google/callback` como redirect URI autorizado.[m
+[32m+[m[32m7. **Crons** (siguiente sección).[m
+[32m+[m[32m8. **Respaldos:** programar `node scripts/respaldo-mysql.mjs /ruta/respaldos` diariamente y cifrar el volumen o el bucket de destino.[m
+[32m+[m
+[32m+[m[32m### Crons[m
+[32m+[m
+[32m+[m[32mLos recordatorios viven en dos rutas que exigen `Authorization: Bearer <CRON_SECRET>`:[m
+[32m+[m
+[32m+[m[32m- `GET /api/recordatorios/12-horas`[m
+[32m+[m[32m- `GET /api/recordatorios/testimonios`[m
+[32m+[m
+[32m+[m[32mVercel crons **no** puede enviar ese header, así que usa GitHub Actions (ya está incluido en [`.github/workflows/cron.yml`](./.github/workflows/cron.yml); define los secrets `APP_URL` y `CRON_SECRET` en el repo) o el crontab del VPS:[m
+[32m+[m
+[32m+[m[32m```cron[m
+[32m+[m[32m*/15 * * * * curl -fsS --max-time 300 -H "Authorization: Bearer $CRON_SECRET" https://tudominio.com/api/recordatorios/12-horas[m
+[32m+[m[32m*/15 * * * * curl -fsS --max-time 300 -H "Authorization: Bearer $CRON_SECRET" https://tudominio.com/api/recordatorios/testimonios[m
+[32m+[m[32m```[m
+[32m+[m
+[32m+[m[32mPuedes probarlas manualmente con `?dryRun=1` en la de 12 horas.[m
+ [m
+[31m-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.[m
+[32m+[m[32m### Almacenamiento de imágenes[m
+ [m
+[31m-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.[m
+[32m+[m[32mPerfil, logo, trayectoria y publicaciones se escriben en `UPLOAD_DIR` (por defecto `public/uploads`). En un VPS monta un volumen persistente y sirve ese directorio con el proxy; `public/uploads` está ignorado en git. Para serverless haría falta object storage (S3/R2/Cloudinary).[m
+ [m
+[31m-## Learn More[m
+[32m+[m[32m## Operación[m
+ [m
+[31m-To learn more about Next.js, take a look at the following resources:[m
+[32m+[m[32m| Tarea | Comando / ruta |[m
+[32m+[m[32m| --- | --- |[m
+[32m+[m[32m| Salud de la app + MySQL | `GET /api/health` |[m
+[32m+[m[32m| Crear administrador | `node scripts/crear-admin.mjs` |[m
+[32m+[m[32m| Restablecer contraseña | `node scripts/restablecer-admin.mjs` |[m
+[32m+[m[32m| Respaldo MySQL | `node scripts/respaldo-mysql.mjs [destino]` |[m
+[32m+[m[32m| Crear bloqueos de agenda | `POST /api/bloqueos-agenda` (sesión admin) |[m
+[32m+[m[32m| Migraciones de datos | `node scripts/migrar-bloqueos-agenda.mjs`, `node scripts/migrar-tipo-servicio.mjs` |[m
+ [m
+[31m-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.[m
+[31m-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.[m
+[32m+[m[32m## Seguridad vigente[m
+ [m
+[31m-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome![m
+[32m+[m[32mCookies `httpOnly` + `Secure` en producción; sesión HMAC con `timingSafeEqual`; contraseñas con `scrypt` + salt; SQL parametrizado en todo el repo; webhook Wompi valida checksum SHA-256, monto y moneda, con `FOR UPDATE` e idempotencia por `transaccion_id`; rate limit en login (10/15 min) y reserva/pago (20/hora); headers de seguridad en `next.config.ts`; refresh_token de Google cifrado AES-256-GCM en reposo; consulta pública de agenda sin ids internos; crons protegidos con Bearer.[m
+ [m
+[31m-## Deploy on Vercel[m
+[32m+[m[32mPD: trata los datos de clientes según la Ley 1581 de Colombia: MySQL cifrado en reposo, respaldos cifrados, acceso mínimo y retención definida.[m
+ [m
+[31m-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.[m
+[32m+[m[32m## Licencia[m
+ [m
+[31m-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.[m
+[32m+[m[32mPrivada.[m
+[1mdiff --git a/app/admin/blog/page.tsx b/app/admin/blog/page.tsx[m
+[1mindex ee91591..43a7298 100644[m
+[1m--- a/app/admin/blog/page.tsx[m
+[1m+++ b/app/admin/blog/page.tsx[m
+[36m@@ -64,8 +64,6 @@[m [mexport default function BlogAdmin() {[m
+ [m
+   async function cargarPublicaciones() {[m
+     try {[m
+[31m-      setCargando(true);[m
+[31m-[m
+       const respuesta = await fetch([m
+         "/api/publicaciones?admin=true",[m
+         {[m
+[36m@@ -312,6 +310,8 @@[m [mexport default function BlogAdmin() {[m
+       setArchivoImagen(null);[m
+       setVistaPreviaImagen("");[m
+ [m
+[32m+[m[32m      setCargando(true);[m
+[32m+[m
+       await cargarPublicaciones();[m
+     } catch (error) {[m
+       console.error(error);[m
+[36m@@ -380,6 +380,8 @@[m [mexport default function BlogAdmin() {[m
+ [m
+       cancelarEliminacion();[m
+ [m
+[32m+[m[32m      setCargando(true);[m
+[32m+[m
+       await cargarPublicaciones();[m
+     } catch (error) {[m
+       console.error(error);[m
+[36m@@ -442,6 +444,8 @@[m [mexport default function BlogAdmin() {[m
+         "exito"[m
+       );[m
+ [m
+[32m+[m[32m      setCargando(true);[m
+[32m+[m
+       await cargarPublicaciones();[m
+     } catch (error) {[m
+       console.error(error);[m
+[1mdiff --git a/app/admin/page.tsx b/app/admin/page.tsx[m
+[1mindex 748fdc1..3ccd447 100644[m
+[1m--- a/app/admin/page.tsx[m
+[1m+++ b/app/admin/page.tsx[m
+[36m@@ -1,6 +1,7 @@[m
+ "use client";[m
+ [m
+ import { useEffect, useState } from "react";[m
+[32m+[m[32mimport Link from "next/link";[m
+ import AdminNav from "../components/AdminNav";[m
+ [m
+ type DisponibilidadSemanal = {[m
+[36m@@ -19,8 +20,22 @@[m [mtype CitaOcupada = {[m
+     hora: string;[m
+ };[m
+ [m
+[32m+[m[32mtype Cita = {[m
+[32m+[m[32m    id: number;[m
+[32m+[m[32m    fecha: string;[m
+[32m+[m[32m    hora: string;[m
+[32m+[m[32m    modalidad: string;[m
+[32m+[m[32m    estado: string;[m
+[32m+[m[32m    origen_reserva: string | null;[m
+[32m+[m[32m    nombre_completo: string;[m
+[32m+[m[32m    email: string;[m
+[32m+[m[32m    telefono: string;[m
+[32m+[m[32m    servicio_nombre: string;[m
+[32m+[m[32m    cedula?: string | null;[m
+[32m+[m[32m};[m
+[32m+[m
+ export default function AdminPage() {[m
+[31m-    const [citas, setCitas] = useState<any[]>([]);[m
+[32m+[m[32m    const [citas, setCitas] = useState<Cita[]>([]);[m
+     const [cargando, setCargando] = useState(true);[m
+     const [filtro, setFiltro] = useState("TODAS");[m
+     const [busqueda, setBusqueda] = useState("");[m
+[36m@@ -33,10 +48,10 @@[m [mexport default function AdminPage() {[m
+             .replace(/[\u0300-\u036f]/g, "")[m
+             .toLowerCase();[m
+     }[m
+[31m-    const [citaSeleccionada, setCitaSeleccionada] = useState<any>(null);[m
+[32m+[m[32m    const [citaSeleccionada, setCitaSeleccionada] = useState<Cita | null>(null);[m
+ [m
+     const [accionPendiente, setAccionPendiente] = useState<{[m
+[31m-        cita: any;[m
+[32m+[m[32m        cita: Cita;[m
+         estado: string;[m
+     } | null>(null);[m
+ [m
+[36m@@ -61,7 +76,7 @@[m [mexport default function AdminPage() {[m
+     // REPROGRAMACIÓN[m
+     // ================================[m
+ [m
+[31m-    const [citaReprogramar, setCitaReprogramar] = useState<any>(null);[m
+[32m+[m[32m    const [citaReprogramar, setCitaReprogramar] = useState<Cita | null>(null);[m
+     const [nuevaFecha, setNuevaFecha] = useState("");[m
+     const [nuevaHora, setNuevaHora] = useState("");[m
+     const [horasDisponibles, setHorasDisponibles] = useState<string[]>([]);[m
+[36m@@ -71,10 +86,6 @@[m [mexport default function AdminPage() {[m
+     const [procesandoReprogramacion, setProcesandoReprogramacion] =[m
+         useState(false);[m
+ [m
+[31m-    useEffect(() => {[m
+[31m-        cargarCitas();[m
+[31m-    }, []);[m
+[31m-[m
+     async function cargarCitas() {[m
+         try {[m
+             const respuesta = await fetch("/api/citas");[m
+[36m@@ -93,6 +104,10 @@[m [mexport default function AdminPage() {[m
+         }[m
+     }[m
+ [m
+[32m+[m[32m    useEffect(() => {[m
+[32m+[m[32m        cargarCitas();[m
+[32m+[m[32m    }, []);[m
+[32m+[m
+     const citasFiltradas = citas.filter((cita) => {[m
+         const ahora = new Date();[m
+         const fechaCita = convertirFechaParaComparacion(cita.fecha);[m
+[36m@@ -124,7 +139,7 @@[m [mexport default function AdminPage() {[m
+         // a la base de datos, esta misma búsqueda la incluirá[m
+         // automáticamente (cita.cedula), sin tener que tocar esto.[m
+         const nombre = normalizarTexto(String(cita.nombre_completo || ""));[m
+[31m-        const cedula = normalizarTexto(String((cita as any).cedula || ""));[m
+[32m+[m[32m        const cedula = normalizarTexto(String(cita.cedula || ""));[m
+ [m
+         return nombre.includes(termino) || cedula.includes(termino);[m
+     }).sort((a, b) => {[m
+[36m@@ -426,7 +441,7 @@[m [mexport default function AdminPage() {[m
+     // ABRIR REPROGRAMACIÓN[m
+     // ================================[m
+ [m
+[31m-    function abrirReprogramacion(cita: any) {[m
+[32m+[m[32m    function abrirReprogramacion(cita: Cita) {[m
+         setCitaReprogramar(cita);[m
+         setNuevaFecha("");[m
+         setNuevaHora("");[m
+[36m@@ -559,12 +574,12 @@[m [mexport default function AdminPage() {[m
+                             </p>[m
+                         </div>[m
+ [m
+[31m-                        <a[m
+[32m+[m[32m                        <Link[m
+                             href="/"[m
+                             className="text-sm text-[#707469] transition hover:text-[#C56835]"[m
+                         >[m
+                             Volver al sitio[m
+[31m-                        </a>[m
+[32m+[m[32m                        </Link>[m
+ [m
+                     </div>[m
+                 </header>[m
+[1mdiff --git a/app/admin/pagos/page.tsx b/app/admin/pagos/page.tsx[m
+[1mindex 24a3400..a558716 100644[m
+[1m--- a/app/admin/pagos/page.tsx[m
+[1m+++ b/app/admin/pagos/page.tsx[m
+[36m@@ -137,9 +137,6 @@[m [mexport default function PagosAdmin() {[m
+ [m
+   async function cargarPagos() {[m
+     try {[m
+[31m-      setCargando(true);[m
+[31m-      setError("");[m
+[31m-[m
+       const respuesta = await fetch("/api/pagos", {[m
+         cache: "no-store",[m
+       });[m
+[36m@@ -240,7 +237,12 @@[m [mexport default function PagosAdmin() {[m
+ [m
+             <button[m
+               type="button"[m
+[31m-              onClick={cargarPagos}[m
+[32m+[m[32m              onClick={() => {[m
+[32m+[m[32m                setCargando(true);[m
+[32m+[m[32m                setError("");[m
+[32m+[m
+[32m+[m[32m                cargarPagos();[m
+[32m+[m[32m              }}[m
+               disabled={cargando}[m
+               className="inline-flex min-h-11 items-center justify-center rounded-full border border-[#59614D] px-5 py-2.5 text-sm font-medium text-[#59614D] transition hover:bg-[#59614D] hover:text-white disabled:cursor-not-allowed disabled:opacity-50"[m
+             >[m
+[1mdiff --git a/app/agendar/page.tsx b/app/agendar/page.tsx[m
+[1mindex 51d436a..77c3ad1 100644[m
+[1m--- a/app/agendar/page.tsx[m
+[1m+++ b/app/agendar/page.tsx[m
+[36m@@ -1,6 +1,7 @@[m
+ "use client";[m
+ [m
+[31m-import { useEffect, useState } from "react";[m
+[32m+[m[32mimport { useEffect, useMemo, useState } from "react";[m
+[32m+[m[32mimport Link from "next/link";[m
+ import { formatearDuracion } from "../lib/duracion";[m
+ import {[m
+   agregarMinutosAFechaHora,[m
+[36m@@ -30,22 +31,46 @@[m [mtype ResultadoProximaDisponibilidad = {[m
+   proxima: { fecha: string; hora: string } | null;[m
+ };[m
+ [m
+[32m+[m[32mtype Disponibilidad = {[m
+[32m+[m[32m  id: number;[m
+[32m+[m[32m  dia_semana: number;[m
+[32m+[m[32m  hora_inicio: string;[m
+[32m+[m[32m  hora_fin: string;[m
+[32m+[m[32m  activo: number;[m
+[32m+[m[32m};[m
+[32m+[m
+[32m+[m[32mtype DisponibilidadEspecial = {[m
+[32m+[m[32m  id: number;[m
+[32m+[m[32m  fecha: string;[m
+[32m+[m[32m  hora_inicio: string | null;[m
+[32m+[m[32m  hora_fin: string | null;[m
+[32m+[m[32m  activo: number;[m
+[32m+[m[32m};[m
+[32m+[m
+[32m+[m[32mtype CitaCreada = {[m
+[32m+[m[32m  cita_id: number;[m
+[32m+[m[32m  fecha: string;[m
+[32m+[m[32m  hora: string;[m
+[32m+[m[32m  modalidad: string;[m
+[32m+[m[32m  servicio: string;[m
+[32m+[m[32m  referencia: string;[m
+[32m+[m[32m  monto: number;[m
+[32m+[m[32m};[m
+[32m+[m
+ export default function AgendarPage() {[m
+   const [servicios, setServicios] = useState<Servicio[]>([]);[m
+   const [servicioSeleccionado, setServicioSeleccionado] = useState("");[m
+   const [modalidad, setModalidad] = useState("");[m
+   const [fecha, setFecha] = useState("");[m
+   const [hora, setHora] = useState("");[m
+[31m-  const [disponibilidad, setDisponibilidad] = useState<any[]>([]);[m
+[32m+[m[32m  const [disponibilidad, setDisponibilidad] = useState<Disponibilidad[]>([]);[m
+   const [disponibilidadesEspeciales, setDisponibilidadesEspeciales] =[m
+[31m-    useState<any[]>([]);[m
+[32m+[m[32m    useState<DisponibilidadEspecial[]>([]);[m
+ [m
+[31m-  const [horasDisponibles, setHorasDisponibles] = useState<string[]>([]);[m
+   const [horasOcupadas, setHorasOcupadas] = useState<[m
+     { hora: string; duracion_minutos: number }[][m
+   >([]);[m
+   const [bloqueosAgenda, setBloqueosAgenda] = useState<BloqueoAgenda[]>([]);[m
+[31m-  const [horaFinDisponibilidad, setHoraFinDisponibilidad] = useState("");[m
+   const [resultadoProximaDisponibilidad, setResultadoProximaDisponibilidad] =[m
+     useState<ResultadoProximaDisponibilidad | null>(null);[m
+ [m
+[36m@@ -53,8 +78,8 @@[m [mexport default function AgendarPage() {[m
+   const [email, setEmail] = useState("");[m
+   const [telefono, setTelefono] = useState("");[m
+   const [aceptaDatos, setAceptaDatos] = useState(false);[m
+[31m-  const [mostrarConfirmacion, setMostrarConfirmacion] = useState(false);[m
+[31m-  const [citaCreada, setCitaCreada] = useState<any>(null);[m
+[32m+[m[32m  const [mostrarConfirmacion] = useState(false);[m
+[32m+[m[32m  const [citaCreada, setCitaCreada] = useState<CitaCreada | null>(null);[m
+ [m
+   const [mostrarAlerta, setMostrarAlerta] = useState(false);[m
+   const [datosAlerta, setDatosAlerta] = useState<{[m
+[36m@@ -199,10 +224,6 @@[m [mexport default function AgendarPage() {[m
+     };[m
+   }[m
+ [m
+[31m-  const hayHoraDisponible = horasDisponibles.some([m
+[31m-    (horaDisponible) => obtenerEstadoHora(horaDisponible).disponible[m
+[31m-  );[m
+[31m-[m
+   function generarHoras([m
+     horaInicio: string,[m
+     horaFin: string[m
+[36m@@ -250,12 +271,9 @@[m [mexport default function AgendarPage() {[m
+     return `${hora12}:${minutos} ${periodo}`;[m
+   }[m
+ [m
+[31m-  useEffect(() => {[m
+[32m+[m[32m  const { horasDisponibles, horaFinDisponibilidad } = useMemo(() => {[m
+     if (!fecha) {[m
+[31m-      setHorasDisponibles([]);[m
+[31m-      setHoraFinDisponibilidad("");[m
+[31m-      setHora("");[m
+[31m-      return;[m
+[32m+[m[32m      return { horasDisponibles: [] as string[], horaFinDisponibilidad: "" };[m
+     }[m
+ [m
+     const fechaSeleccionada =[m
+[36m@@ -283,21 +301,16 @@[m [mexport default function AgendarPage() {[m
+         !disponibilidadEspecial.hora_inicio ||[m
+         !disponibilidadEspecial.hora_fin[m
+       ) {[m
+[31m-        setHorasDisponibles([]);[m
+[31m-        setHoraFinDisponibilidad("");[m
+[31m-        setHora("");[m
+[31m-        return;[m
+[32m+[m[32m        return { horasDisponibles: [] as string[], horaFinDisponibilidad: "" };[m
+       }[m
+ [m
+[31m-      const horas = generarHoras([m
+[31m-        disponibilidadEspecial.hora_inicio,[m
+[31m-        disponibilidadEspecial.hora_fin[m
+[31m-      );[m
+[31m-[m
+[31m-      setHorasDisponibles(horas);[m
+[31m-      setHoraFinDisponibilidad(disponibilidadEspecial.hora_fin);[m
+[31m-      setHora("");[m
+[31m-      return;[m
+[32m+[m[32m      return {[m
+[32m+[m[32m        horasDisponibles: generarHoras([m
+[32m+[m[32m          disponibilidadEspecial.hora_inicio,[m
+[32m+[m[32m          disponibilidadEspecial.hora_fin[m
+[32m+[m[32m        ),[m
+[32m+[m[32m        horaFinDisponibilidad: disponibilidadEspecial.hora_fin,[m
+[32m+[m[32m      };[m
+     }[m
+ [m
+     // ==========================================[m
+[36m@@ -312,26 +325,26 @@[m [mexport default function AgendarPage() {[m
+       );[m
+ [m
+     if (!disponibilidadDia) {[m
+[31m-      setHorasDisponibles([]);[m
+[31m-      setHoraFinDisponibilidad("");[m
+[31m-      setHora("");[m
+[31m-      return;[m
+[32m+[m[32m      return { horasDisponibles: [] as string[], horaFinDisponibilidad: "" };[m
+     }[m
+ [m
+[31m-    const horas = generarHoras([m
+[31m-      disponibilidadDia.hora_inicio,[m
+[31m-      disponibilidadDia.hora_fin[m
+[31m-    );[m
+[31m-[m
+[31m-    setHorasDisponibles(horas);[m
+[31m-    setHoraFinDisponibilidad(disponibilidadDia.hora_fin);[m
+[31m-    setHora("");[m
+[32m+[m[32m    return {[m
+[32m+[m[32m      horasDisponibles: generarHoras([m
+[32m+[m[32m        disponibilidadDia.hora_inicio,[m
+[32m+[m[32m        disponibilidadDia.hora_fin[m
+[32m+[m[32m      ),[m
+[32m+[m[32m      horaFinDisponibilidad: disponibilidadDia.hora_fin,[m
+[32m+[m[32m    };[m
+   }, [[m
+     fecha,[m
+     disponibilidad,[m
+     disponibilidadesEspeciales,[m
+   ]);[m
+ [m
+[32m+[m[32m  const hayHoraDisponible = horasDisponibles.some([m
+[32m+[m[32m    (horaDisponible) => obtenerEstadoHora(horaDisponible).disponible[m
+[32m+[m[32m  );[m
+[32m+[m
+   useEffect(() => {[m
+     if (!fecha || !servicioActual || hayHoraDisponible) return;[m
+ [m
+[36m@@ -679,19 +692,19 @@[m [mexport default function AgendarPage() {[m
+ [m
+         <header className="border-b border-[#D8D0C5] bg-[#F7F1E9]/95">[m
+           <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-5">[m
+[31m-            <a[m
+[32m+[m[32m            <Link[m
+               href="/"[m
+               className="font-serif text-xl text-[#3F4635]"[m
+             >[m
+               Aura Elisa Sánchez[m
+[31m-            </a>[m
+[32m+[m[32m            </Link>[m
+ [m
+[31m-            <a[m
+[32m+[m[32m            <Link[m
+               href="/"[m
+               className="text-sm text-[#707469] hover:text-[#C56835]"[m
+             >[m
+               Volver al inicio[m
+[31m-            </a>[m
+[32m+[m[32m            </Link>[m
+           </div>[m
+         </header>[m
+ [m
+[1mdiff --git a/app/api/auth/cambiar-password/route.ts b/app/api/auth/cambiar-password/route.ts[m
+[1mindex 96d1beb..30784ee 100644[m
+[1m--- a/app/api/auth/cambiar-password/route.ts[m
+[1m+++ b/app/api/auth/cambiar-password/route.ts[m
+[36m@@ -1,5 +1,6 @@[m
+ import { NextRequest, NextResponse } from "next/server";[m
+ import crypto from "crypto";[m
+[32m+[m[32mimport type { RowDataPacket } from "mysql2";[m
+ import pool from "../../../lib/db";[m
+ [m
+ function verificarPassword([m
+[36m@@ -196,7 +197,7 @@[m [mexport async function POST(request: NextRequest) {[m
+             );[m
+         }[m
+ [m
+[31m-        const [filas] = await pool.query([m
+[32m+[m[32m        const [filas] = await pool.query<RowDataPacket[]>([m
+             `[m
+             SELECT[m
+                 id,[m
+[36m@@ -209,7 +210,7 @@[m [mexport async function POST(request: NextRequest) {[m
+             [sesion.id][m
+         );[m
+ [m
+[31m-        const administradores = filas as any[];[m
+[32m+[m[32m        const administradores = filas;[m
+ [m
+         if (administradores.length === 0) {[m
+             return NextResponse.json([m
+[1mdiff --git a/app/api/auth/login/route.ts b/app/api/auth/login/route.ts[m
+[1mindex 1ba4484..9a0d905 100644[m
+[1m--- a/app/api/auth/login/route.ts[m
+[1m+++ b/app/api/auth/login/route.ts[m
+[36m@@ -1,6 +1,11 @@[m
+ import { NextRequest, NextResponse } from "next/server";[m
+ import crypto from "crypto";[m
+[32m+[m[32mimport type { RowDataPacket } from "mysql2";[m
+ import pool from "../../../lib/db";[m
+[32m+[m[32mimport {[m
+[32m+[m[32m  ipDelCliente,[m
+[32m+[m[32m  permitirIntento,[m
+[32m+[m[32m} from "../../../lib/rate-limit";[m
+ [m
+ function verificarPassword(password: string, passwordGuardada: string) {[m
+     const partes = passwordGuardada.split(":");[m
+[36m@@ -61,6 +66,19 @@[m [mfunction crearTokenSesion(id: number, debeCambiarPassword: boolean) {[m
+ [m
+ export async function POST(request: NextRequest) {[m
+     try {[m
+[32m+[m[32m        // Protección contra fuerza bruta:[m
+[32m+[m[32m        // 10 intentos por IP cada 15 minutos.[m
+[32m+[m[32m        const ip = ipDelCliente(request);[m
+[32m+[m
+[32m+[m[32m        if (!permitirIntento(`login:${ip}`, 10, 15 * 60 * 1000)) {[m
+[32m+[m[32m            return NextResponse.json([m
+[32m+[m[32m                {[m
+[32m+[m[32m                    error: "Demasiados intentos. Inténtalo en unos minutos.",[m
+[32m+[m[32m                },[m
+[32m+[m[32m                { status: 429 }[m
+[32m+[m[32m            );[m
+[32m+[m[32m        }[m
+[32m+[m
+         const body = await request.json();[m
+ [m
+         const email = String(body.email || "")[m
+[36m@@ -78,7 +96,7 @@[m [mexport async function POST(request: NextRequest) {[m
+             );[m
+         }[m
+ [m
+[31m-        const [filas] = await pool.query([m
+[32m+[m[32m        const [filas] = await pool.query<RowDataPacket[]>([m
+             `[m
+             SELECT[m
+                 id,[m
+[36m@@ -93,7 +111,7 @@[m [mexport async function POST(request: NextRequest) {[m
+             [email][m
+         );[m
+ [m
+[31m-        const administradores = filas as any[];[m
+[32m+[m[32m        const administradores = filas;[m
+ [m
+         if (administradores.length === 0) {[m
+             return NextResponse.json([m
+[1mdiff --git a/app/api/citas/route.ts b/app/api/citas/route.ts[m
+[1mindex 789c451..36de4a9 100644[m
+[1m--- a/app/api/citas/route.ts[m
+[1m+++ b/app/api/citas/route.ts[m
+[36m@@ -1,10 +1,21 @@[m
+ import { NextResponse } from "next/server";[m
+ import { cookies } from "next/headers";[m
+[32m+[m[32mimport type { ResultSetHeader, RowDataPacket } from "mysql2";[m
+ import pool from "./../../lib/db";[m
+ import { verificarSesion } from "./../../lib/auth";[m
+ import { enviarCorreo } from "./../../lib/email";[m
+ import { actualizarEventoGoogleCalendar } from "./../../lib/google-calendar";[m
+ import { horariosSeCruzan } from "./../../lib/horarios";[m
+[32m+[m[32mimport { obtenerAppUrl } from "./../../lib/app-url";[m
+[32m+[m[32mimport {[m
+[32m+[m[32m  ipDelCliente,[m
+[32m+[m[32m  permitirIntento,[m
+[32m+[m[32m} from "./../../lib/rate-limit";[m
+[32m+[m
+[32m+[m[32mtype CitaOcupada = RowDataPacket & {[m
+[32m+[m[32m  hora: string;[m
+[32m+[m[32m  duracion_minutos: number;[m
+[32m+[m[32m};[m
+ [m
+ async function obtenerSesionAdmin() {[m
+   const cookieStore = await cookies();[m
+[36m@@ -15,6 +26,19 @@[m [masync function obtenerSesionAdmin() {[m
+ [m
+ export async function POST(request: Request) {[m
+   try {[m
+[32m+[m[32m    // Protección contra abuso de reservas:[m
+[32m+[m[32m    // 20 solicitudes por IP cada hora.[m
+[32m+[m[32m    const ip = ipDelCliente(request);[m
+[32m+[m
+[32m+[m[32m    if (!permitirIntento(`citas:${ip}`, 20, 60 * 60 * 1000)) {[m
+[32m+[m[32m      return NextResponse.json([m
+[32m+[m[32m        {[m
+[32m+[m[32m          error: "Demasiadas solicitudes. Inténtalo en unos minutos.",[m
+[32m+[m[32m        },[m
+[32m+[m[32m        { status: 429 }[m
+[32m+[m[32m      );[m
+[32m+[m[32m    }[m
+[32m+[m
+     const datos = await request.json();[m
+ [m
+     const {[m
+[36m@@ -55,7 +79,7 @@[m [mexport async function POST(request: Request) {[m
+       );[m
+     }[m
+ [m
+[31m-    const [servicios]: any = await pool.query([m
+[32m+[m[32m    const [servicios] = await pool.query<RowDataPacket[]>([m
+       `[m
+       SELECT[m
+         id,[m
+[36m@@ -92,7 +116,7 @@[m [mexport async function POST(request: Request) {[m
+       );[m
+     }[m
+ [m
+[31m-    const [citasExistentes]: any = await pool.query([m
+[32m+[m[32m    const [citasExistentes] = await pool.query<CitaOcupada[]>([m
+       `[m
+       SELECT c.hora, s.duracion_minutos[m
+       FROM citas c[m
+[36m@@ -103,10 +127,7 @@[m [mexport async function POST(request: Request) {[m
+       [fecha][m
+     );[m
+ [m
+[31m-    const hayCruce = citasExistentes.some((cita: {[m
+[31m-      hora: string;[m
+[31m-      duracion_minutos: number;[m
+[31m-    }) =>[m
+[32m+[m[32m    const hayCruce = citasExistentes.some((cita) =>[m
+       horariosSeCruzan([m
+         hora,[m
+         Number(servicios[0].duracion_minutos),[m
+[36m@@ -124,7 +145,7 @@[m [mexport async function POST(request: Request) {[m
+       );[m
+     }[m
+ [m
+[31m-    const [bloqueos]: any = await pool.query([m
+[32m+[m[32m    const [bloqueos] = await pool.query<RowDataPacket[]>([m
+       `[m
+       SELECT id[m
+       FROM bloqueos_agenda[m
+[36m@@ -149,7 +170,7 @@[m [mexport async function POST(request: Request) {[m
+       );[m
+     }[m
+ [m
+[31m-    const [clientes]: any = await pool.query([m
+[32m+[m[32m    const [clientes] = await pool.query<RowDataPacket[]>([m
+       `[m
+       SELECT id[m
+       FROM clientes[m
+[36m@@ -177,7 +198,7 @@[m [mexport async function POST(request: Request) {[m
+         [nombre_completo, telefono, clienteId][m
+       );[m
+     } else {[m
+[31m-      const [resultadoCliente]: any = await pool.query([m
+[32m+[m[32m      const [resultadoCliente] = await pool.query<ResultSetHeader>([m
+         `[m
+         INSERT INTO clientes ([m
+           nombre_completo,[m
+[36m@@ -194,7 +215,7 @@[m [mexport async function POST(request: Request) {[m
+       clienteId = resultadoCliente.insertId;[m
+     }[m
+ [m
+[31m-    const [resultadoCita]: any = await pool.query([m
+[32m+[m[32m    const [resultadoCita] = await pool.query<ResultSetHeader>([m
+       `[m
+       INSERT INTO citas ([m
+         cliente_id,[m
+[36m@@ -249,9 +270,12 @@[m [mexport async function GET(request: Request) {[m
+     // =====================================================[m
+ [m
+     if (fecha) {[m
+[31m-      const [citas]: any = await pool.query([m
+[32m+[m[32m      // Consulta pública del calendario: se exponen[m
+[32m+[m[32m      // únicamente hora y duración. Los ids internos[m
+[32m+[m[32m      // de cita NO se exponen al público.[m
+[32m+[m[32m      const [citas] = await pool.query<RowDataPacket[]>([m
+         `[m
+[31m-        SELECT c.id, c.hora, s.duracion_minutos[m
+[32m+[m[32m        SELECT c.hora, s.duracion_minutos[m
+         FROM citas c[m
+         INNER JOIN servicios s ON c.servicio_id = s.id[m
+         WHERE c.fecha = ?[m
+[36m@@ -278,7 +302,7 @@[m [mexport async function GET(request: Request) {[m
+       );[m
+     }[m
+ [m
+[31m-    const [citas]: any = await pool.query([m
+[32m+[m[32m    const [citas] = await pool.query<RowDataPacket[]>([m
+       `[m
+       SELECT[m
+         c.id,[m
+[36m@@ -369,7 +393,7 @@[m [mexport async function PATCH(request: Request) {[m
+     // OBTENER INFORMACIÓN DE LA CITA[m
+     // =====================================================[m
+ [m
+[31m-    const [citas]: any = await pool.query([m
+[32m+[m[32m    const [citas] = await pool.query<RowDataPacket[]>([m
+       `[m
+       SELECT[m
+         c.id,[m
+[36m@@ -416,7 +440,7 @@[m [mexport async function PATCH(request: Request) {[m
+         );[m
+       }[m
+ [m
+[31m-      const [resultado]: any = await pool.query([m
+[32m+[m[32m      const [resultado] = await pool.query<ResultSetHeader>([m
+         `[m
+         UPDATE citas[m
+         SET[m
+[36m@@ -478,7 +502,7 @@[m [mexport async function PATCH(request: Request) {[m
+       // VERIFICAR DISPONIBILIDAD[m
+       // ===================================================[m
+ [m
+[31m-      const [citasOcupadas]: any = await pool.query([m
+[32m+[m[32m      const [citasOcupadas] = await pool.query<RowDataPacket[]>([m
+         `[m
+         SELECT id[m
+         FROM citas[m
+[36m@@ -521,8 +545,8 @@[m [mexport async function PATCH(request: Request) {[m
+       // OBTENER LA CITA ACTUALIZADA[m
+       // ===================================================[m
+ [m
+[31m-      const [citaActualizadaRows]: any =[m
+[31m-        await pool.query([m
+[32m+[m[32m      const [citaActualizadaRows] =[m
+[32m+[m[32m        await pool.query<RowDataPacket[]>([m
+           `[m
+           SELECT[m
+             c.id,[m
+[36m@@ -732,7 +756,7 @@[m [mexport async function PATCH(request: Request) {[m
+     // ACTUALIZAR ESTADO[m
+     // =====================================================[m
+ [m
+[31m-    const [resultadoActualizacion]: any = await pool.query([m
+[32m+[m[32m    const [resultadoActualizacion] = await pool.query<ResultSetHeader>([m
+       `[m
+       UPDATE citas[m
+       SET[m
+[36m@@ -832,10 +856,7 @@[m [mexport async function PATCH(request: Request) {[m
+ [m
+                 <div style="text-align:center;margin-top:30px;">[m
+                   <a[m
+[31m-                    href="${[m
+[31m-                      process.env.APP_URL ||[m
+[31m-                      "http://localhost:3000"[m
+[31m-                    }/agendar"[m
+[32m+[m[32m                    href="${obtenerAppUrl()}/agendar"[m
+                     style="display:inline-block;background:#C56835;color:white;text-decoration:none;padding:14px 26px;border-radius:30px;font-weight:bold;"[m
+                   >[m
+                     Agendar nueva cita[m
+[1mdiff --git a/app/api/disponibilidad-especial/route.ts b/app/api/disponibilidad-especial/route.ts[m
+[1mindex 4c1b846..667c6c7 100644[m
+[1m--- a/app/api/disponibilidad-especial/route.ts[m
+[1m+++ b/app/api/disponibilidad-especial/route.ts[m
+[36m@@ -1,5 +1,6 @@[m
+ import { NextResponse } from "next/server";[m
+ import { cookies } from "next/headers";[m
+[32m+[m[32mimport type { ResultSetHeader } from "mysql2";[m
+ import pool from "../../lib/db";[m
+ import { verificarSesion } from "../../lib/auth";[m
+ [m
+[36m@@ -86,7 +87,7 @@[m [mexport async function POST(request: Request) {[m
+       );[m
+     }[m
+ [m
+[31m-    const [resultado]: any = await pool.query([m
+[32m+[m[32m    const [resultado] = await pool.query<ResultSetHeader>([m
+       `[m
+       INSERT INTO disponibilidad_especial[m
+         (fecha, hora_inicio, hora_fin, activo)[m
+[1mdiff --git a/app/api/disponibilidad/route.ts b/app/api/disponibilidad/route.ts[m
+[1mindex ec1f85e..8173bcd 100644[m
+[1m--- a/app/api/disponibilidad/route.ts[m
+[1m+++ b/app/api/disponibilidad/route.ts[m
+[36m@@ -1,5 +1,6 @@[m
+ import { NextResponse } from "next/server";[m
+ import { cookies } from "next/headers";[m
+[32m+[m[32mimport type { ResultSetHeader } from "mysql2";[m
+ import pool from "../../lib/db";[m
+ import { verificarSesion } from "../../lib/auth";[m
+ [m
+[36m@@ -82,7 +83,7 @@[m [mexport async function POST(request: Request) {[m
+       );[m
+     }[m
+ [m
+[31m-    const [resultado]: any = await pool.query([m
+[32m+[m[32m    const [resultado] = await pool.query<ResultSetHeader>([m
+       `[m
+       INSERT INTO disponibilidad[m
+         (dia_semana, hora_inicio, hora_fin, activo)[m
+[1mdiff --git a/app/api/google/callback/route.ts b/app/api/google/callback/route.ts[m
+[1mindex 4bdcbf5..95d36dd 100644[m
+[1m--- a/app/api/google/callback/route.ts[m
+[1m+++ b/app/api/google/callback/route.ts[m
+[36m@@ -1,7 +1,9 @@[m
+ import { NextResponse } from "next/server";[m
+ import { cookies } from "next/headers";[m
+ import { google } from "googleapis";[m
+[32m+[m[32mimport type { RowDataPacket } from "mysql2";[m
+ import pool from "./../../../lib/db";[m
+[32m+[m[32mimport { cifrarToken } from "./../../../lib/seguridad-tokens";[m
+ [m
+ export async function GET(request: Request) {[m
+   try {[m
+[36m@@ -126,8 +128,8 @@[m [mconst emailGoogle = "Cuenta Google";[m
+     // GUARDAR CONEXIÓN EN MYSQL[m
+     // =====================================================[m
+ [m
+[31m-    const [configuracionExistente]: any =[m
+[31m-      await pool.query([m
+[32m+[m[32m    const [configuracionExistente] =[m
+[32m+[m[32m      await pool.query<RowDataPacket[]>([m
+         `[m
+         SELECT id[m
+         FROM google_calendar_config[m
+[36m@@ -148,7 +150,8 @@[m [mconst emailGoogle = "Cuenta Google";[m
+         `,[m
+         [[m
+           emailGoogle,[m
+[31m-          tokens.refresh_token,[m
+[32m+[m[32m          // Se guarda cifrado en reposo (AES-256-GCM).[m
+[32m+[m[32m          cifrarToken(tokens.refresh_token),[m
+           calendarId,[m
+           configuracionExistente[0].id,[m
+         ][m
+[36m@@ -166,7 +169,7 @@[m [mconst emailGoogle = "Cuenta Google";[m
+         `,[m
+         [[m
+           emailGoogle,[m
+[31m-          tokens.refresh_token,[m
+[32m+[m[32m          cifrarToken(tokens.refresh_token),[m
+           calendarId,[m
+         ][m
+       );[m
+[1mdiff --git a/app/api/google/connect/route.ts b/app/api/google/connect/route.ts[m
+[1mindex 8aa1e29..cb8daf9 100644[m
+[1m--- a/app/api/google/connect/route.ts[m
+[1m+++ b/app/api/google/connect/route.ts[m
+[36m@@ -3,7 +3,7 @@[m [mimport { cookies } from "next/headers";[m
+ import crypto from "crypto";[m
+ import { google } from "googleapis";[m
+ import { verificarSesion } from "../../../lib/auth";[m
+[31m-export async function GET(request: Request) {[m
+[32m+[m[32mexport async function GET() {[m
+   try {[m
+     // =====================================================[m
+     // VERIFICAR SESIÓN DEL ADMINISTRADOR[m
+[1mdiff --git a/app/api/health/route.ts b/app/api/health/route.ts[m
+[1mnew file mode 100644[m
+[1mindex 0000000..36f99fc[m
+[1m--- /dev/null[m
+[1m+++ b/app/api/health/route.ts[m
+[36m@@ -0,0 +1,26 @@[m
+[32m+[m[32mimport { NextResponse } from "next/server";[m
+[32m+[m[32mimport pool from "../../lib/db";[m
+[32m+[m
+[32m+[m[32mexport const runtime = "nodejs";[m
+[32m+[m[32mexport const dynamic = "force-dynamic";[m
+[32m+[m
+[32m+[m[32mexport async function GET() {[m
+[32m+[m[32m  try {[m
+[32m+[m[32m    await pool.query("SELECT 1");[m
+[32m+[m
+[32m+[m[32m    return NextResponse.json({[m
+[32m+[m[32m      ok: true,[m
+[32m+[m[32m      estado: "listo",[m
+[32m+[m[32m    });[m
+[32m+[m[32m  } catch (error) {[m
+[32m+[m[32m    console.error("Healthcheck falló:", error);[m
+[32m+[m
+[32m+[m[32m    return NextResponse.json([m
+[32m+[m[32m      {[m
+[32m+[m[32m        ok: false,[m
+[32m+[m[32m        estado: "error",[m
+[32m+[m[32m      },[m
+[32m+[m[32m      { status: 503 }[m
+[32m+[m[32m    );[m
+[32m+[m[32m  }[m
+[32m+[m[32m}[m
+[1mdiff --git a/app/api/pagos/limpiar-pendientes/route.ts b/app/api/pagos/limpiar-pendientes/route.ts[m
+[1mindex 2d66e35..bebc1a8 100644[m
+[1m--- a/app/api/pagos/limpiar-pendientes/route.ts[m
+[1m+++ b/app/api/pagos/limpiar-pendientes/route.ts[m
+[36m@@ -1,5 +1,6 @@[m
+ import { NextResponse } from "next/server";[m
+ import { cookies } from "next/headers";[m
+[32m+[m[32mimport type { ResultSetHeader, RowDataPacket } from "mysql2";[m
+ [m
+ import pool from "./../../../lib/db";[m
+ import { verificarSesion } from "./../../../lib/auth";[m
+[36m@@ -44,7 +45,7 @@[m [masync function limpiarPagosPendientes() {[m
+       // BUSCAR PAGOS PENDIENTES VENCIDOS[m
+       // ==================================================[m
+ [m
+[31m-      const [pagosVencidos]: any = await conexion.query(`[m
+[32m+[m[32m      const [pagosVencidos] = await conexion.query<RowDataPacket[]>(`[m
+         SELECT[m
+           p.id AS pago_id,[m
+           p.cita_id,[m
+[36m@@ -79,13 +80,13 @@[m [masync function limpiarPagosPendientes() {[m
+       // ==================================================[m
+ [m
+       const pagoIds = pagosVencidos.map([m
+[31m-        (pago: any) => pago.pago_id[m
+[32m+[m[32m        (pago) => pago.pago_id[m
+       );[m
+ [m
+       const citaIds = [[m
+         ...new Set([m
+           pagosVencidos.map([m
+[31m-            (pago: any) => pago.cita_id[m
+[32m+[m[32m            (pago) => pago.cita_id[m
+           )[m
+         ),[m
+       ];[m
+[36m@@ -98,8 +99,8 @@[m [masync function limpiarPagosPendientes() {[m
+         .map(() => "?")[m
+         .join(",");[m
+ [m
+[31m-      const [resultadoPagos]: any =[m
+[31m-        await conexion.query([m
+[32m+[m[32m      const [resultadoPagos] =[m
+[32m+[m[32m        await conexion.query<ResultSetHeader>([m
+           `[m
+           UPDATE pagos[m
+           SET[m
+[36m@@ -119,8 +120,7 @@[m [masync function limpiarPagosPendientes() {[m
+         .map(() => "?")[m
+         .join(",");[m
+ [m
+[31m-      const [resultadoCitas]: any =[m
+[31m-        await conexion.query([m
+[32m+[m[32m      await conexion.query<ResultSetHeader>([m
+           `[m
+           UPDATE citas[m
+           SET[m
+[36m@@ -149,7 +149,7 @@[m [masync function limpiarPagosPendientes() {[m
+         cantidad: resultadoPagos.affectedRows,[m
+         pagos_cancelados: pagoIds,[m
+         citas_canceladas: citaIds,[m
+[31m-        detalles: pagosVencidos.map((pago: any) => ({[m
+[32m+[m[32m        detalles: pagosVencidos.map((pago) => ({[m
+           pago_id: pago.pago_id,[m
+           cita_id: pago.cita_id,[m
+           referencia: pago.referencia,[m
+[1mdiff --git a/app/api/pagos/route.ts b/app/api/pagos/route.ts[m
+[1mindex c3623d1..9fcfb09 100644[m
+[1m--- a/app/api/pagos/route.ts[m
+[1m+++ b/app/api/pagos/route.ts[m
+[36m@@ -1,9 +1,19 @@[m
+ import { NextResponse } from "next/server";[m
+ import { cookies } from "next/headers";[m
+ import crypto from "crypto";[m
+[32m+[m[32mimport type { ResultSetHeader, RowDataPacket } from "mysql2";[m
+ import pool from "./../../lib/db";[m
+ import { verificarSesion } from "./../../lib/auth";[m
+ import { horariosSeCruzan } from "./../../lib/horarios";[m
+[32m+[m[32mimport {[m
+[32m+[m[32m  ipDelCliente,[m
+[32m+[m[32m  permitirIntento,[m
+[32m+[m[32m} from "./../../lib/rate-limit";[m
+[32m+[m
+[32m+[m[32mtype CitaOcupada = RowDataPacket & {[m
+[32m+[m[32m  hora: string;[m
+[32m+[m[32m  duracion_minutos: number;[m
+[32m+[m[32m};[m
+ [m
+ async function obtenerSesionAdmin() {[m
+   const cookieStore = await cookies();[m
+[36m@@ -70,7 +80,7 @@[m [mexport async function GET(request: Request) {[m
+         ON c.servicio_id = s.id[m
+     `;[m
+ [m
+[31m-    const parametros: any[] = [];[m
+[32m+[m[32m    const parametros: string[] = [];[m
+ [m
+     if ([m
+       estado &&[m
+[36m@@ -91,7 +101,7 @@[m [mexport async function GET(request: Request) {[m
+         p.id DESC[m
+     `;[m
+ [m
+[31m-    const [pagos]: any = await pool.query([m
+[32m+[m[32m    const [pagos] = await pool.query<RowDataPacket[]>([m
+       consulta,[m
+       parametros[m
+     );[m
+[36m@@ -119,6 +129,20 @@[m [mexport async function POST(request: Request) {[m
+   const conexion = await pool.getConnection();[m
+ [m
+   try {[m
+[32m+[m[32m    // Protección contra abuso de pagos:[m
+[32m+[m[32m    // 20 solicitudes por IP cada hora.[m
+[32m+[m[32m    const ip = ipDelCliente(request);[m
+[32m+[m
+[32m+[m[32m    if (!permitirIntento(`pagos:${ip}`, 20, 60 * 60 * 1000)) {[m
+[32m+[m[32m      // El finally libera la conexión.[m
+[32m+[m[32m      return NextResponse.json([m
+[32m+[m[32m        {[m
+[32m+[m[32m          error: "Demasiadas solicitudes. Inténtalo en unos minutos.",[m
+[32m+[m[32m        },[m
+[32m+[m[32m        { status: 429 }[m
+[32m+[m[32m      );[m
+[32m+[m[32m    }[m
+[32m+[m
+     const datos = await request.json();[m
+ [m
+     const {[m
+[36m@@ -191,7 +215,7 @@[m [mexport async function POST(request: Request) {[m
+     // SERVICIO[m
+     // ====================================================[m
+ [m
+[31m-    const [servicios]: any = await conexion.query([m
+[32m+[m[32m    const [servicios] = await conexion.query<RowDataPacket[]>([m
+       `[m
+       SELECT[m
+         id,[m
+[36m@@ -252,8 +276,8 @@[m [mexport async function POST(request: Request) {[m
+     // VALIDAR HORARIO[m
+     // ====================================================[m
+ [m
+[31m-    const [citasExistentes]: any =[m
+[31m-      await conexion.query([m
+[32m+[m[32m    const [citasExistentes] =[m
+[32m+[m[32m      await conexion.query<CitaOcupada[]>([m
+         `[m
+         SELECT c.hora, s.duracion_minutos[m
+         FROM citas c[m
+[36m@@ -264,10 +288,7 @@[m [mexport async function POST(request: Request) {[m
+         [fecha][m
+       );[m
+ [m
+[31m-    const hayCruce = citasExistentes.some((cita: {[m
+[31m-      hora: string;[m
+[31m-      duracion_minutos: number;[m
+[31m-    }) =>[m
+[32m+[m[32m    const hayCruce = citasExistentes.some((cita) =>[m
+       horariosSeCruzan([m
+         hora,[m
+         Number(servicio.duracion_minutos),[m
+[36m@@ -286,7 +307,7 @@[m [mexport async function POST(request: Request) {[m
+       );[m
+     }[m
+ [m
+[31m-    const [bloqueos]: any = await conexion.query([m
+[32m+[m[32m    const [bloqueos] = await conexion.query<RowDataPacket[]>([m
+       `[m
+       SELECT id[m
+       FROM bloqueos_agenda[m
+[36m@@ -367,7 +388,7 @@[m [mexport async function POST(request: Request) {[m
+     // BUSCAR CLIENTE[m
+     // ====================================================[m
+ [m
+[31m-    const [clientes]: any = await conexion.query([m
+[32m+[m[32m    const [clientes] = await conexion.query<RowDataPacket[]>([m
+       `[m
+       SELECT id[m
+       FROM clientes[m
+[36m@@ -399,8 +420,8 @@[m [mexport async function POST(request: Request) {[m
+         ][m
+       );[m
+     } else {[m
+[31m-      const [resultadoCliente]: any =[m
+[31m-        await conexion.query([m
+[32m+[m[32m      const [resultadoCliente] =[m
+[32m+[m[32m        await conexion.query<ResultSetHeader>([m
+           `[m
+           INSERT INTO clientes ([m
+             nombre_completo,[m
+[36m@@ -425,8 +446,8 @@[m [mexport async function POST(request: Request) {[m
+     // CREAR CITA[m
+     // ====================================================[m
+ [m
+[31m-    const [resultadoCita]: any =[m
+[31m-      await conexion.query([m
+[32m+[m[32m    const [resultadoCita] =[m
+[32m+[m[32m      await conexion.query<ResultSetHeader>([m
+         `[m
+         INSERT INTO citas ([m
+           cliente_id,[m
+[1mdiff --git a/app/api/perfil/logo/upload/route.ts b/app/api/perfil/logo/upload/route.ts[m
+[1mindex eca1209..c21c05c 100644[m
+[1m--- a/app/api/perfil/logo/upload/route.ts[m
+[1m+++ b/app/api/perfil/logo/upload/route.ts[m
+[36m@@ -1,9 +1,7 @@[m
+ import { NextResponse } from "next/server";[m
+ import { cookies } from "next/headers";[m
+[31m-import { mkdir, writeFile } from "fs/promises";[m
+[31m-import path from "path";[m
+[31m-import crypto from "crypto";[m
+ import { verificarSesion } from "../../../../lib/auth";[m
+[32m+[m[32mimport { guardarImagenSubida } from "../../../../lib/uploads";[m
+ [m
+ export const runtime = "nodejs";[m
+ [m
+[36m@@ -56,40 +54,11 @@[m [mexport async function POST(request: Request) {[m
+             );[m
+         }[m
+ [m
+[31m-        const extensiones: Record<string, string> = {[m
+[31m-            "image/jpeg": "jpg",[m
+[31m-            "image/png": "png",[m
+[31m-            "image/webp": "webp",[m
+[31m-        };[m
+[31m-[m
+[31m-        const extension = extensiones[archivo.type];[m
+[31m-[m
+[31m-        const nombreArchivo = `${crypto.randomUUID()}.${extension}`;[m
+[31m-[m
+[31m-        const carpeta = path.join([m
+[31m-            process.cwd(),[m
+[31m-            "public",[m
+[31m-            "uploads",[m
+[31m-            "logo"[m
+[31m-        );[m
+[31m-[m
+[31m-        await mkdir(carpeta, { recursive: true });[m
+[31m-[m
+[31m-        const rutaArchivo = path.join([m
+[31m-            carpeta,[m
+[31m-            nombreArchivo[m
+[31m-        );[m
+[31m-[m
+[31m-        const bytes = await archivo.arrayBuffer();[m
+[31m-[m
+[31m-        await writeFile([m
+[31m-            rutaArchivo,[m
+[31m-            Buffer.from(bytes)[m
+[31m-        );[m
+[32m+[m[32m        const { url } = await guardarImagenSubida("logo", archivo);[m
+ [m
+         return NextResponse.json({[m
+             ok: true,[m
+[31m-            url: `/uploads/logo/${nombreArchivo}`,[m
+[32m+[m[32m            url,[m
+         });[m
+     } catch (error) {[m
+         console.error([m
+[1mdiff --git a/app/api/perfil/route.ts b/app/api/perfil/route.ts[m
+[1mindex ca3c2e0..1260d46 100644[m
+[1m--- a/app/api/perfil/route.ts[m
+[1m+++ b/app/api/perfil/route.ts[m
+[36m@@ -1,5 +1,6 @@[m
+ import { NextResponse } from "next/server";[m
+ import { cookies } from "next/headers";[m
+[32m+[m[32mimport type { RowDataPacket, ResultSetHeader } from "mysql2";[m
+ import pool from "../../lib/db";[m
+ import { verificarSesion } from "../../lib/auth";[m
+ [m
+[36m@@ -14,7 +15,7 @@[m [masync function obtenerSesionAdmin() {[m
+ // PÚBLICO[m
+ export async function GET() {[m
+   try {[m
+[31m-    const [filas]: any = await pool.query(`[m
+[32m+[m[32m    const [filas] = await pool.query<RowDataPacket[]>(`[m
+       SELECT[m
+         id,[m
+         nombre_profesional,[m
+[36m@@ -86,7 +87,7 @@[m [mexport async function PUT(request: Request) {[m
+       );[m
+     }[m
+ [m
+[31m-    const [filas]: any = await pool.query(`[m
+[32m+[m[32m    const [filas] = await pool.query<RowDataPacket[]>(`[m
+       SELECT id[m
+       FROM configuracion_general[m
+       ORDER BY id ASC[m
+[36m@@ -126,7 +127,7 @@[m [mexport async function PUT(request: Request) {[m
+         : null;[m
+ [m
+     if (filas.length === 0) {[m
+[31m-      const [resultado]: any = await pool.query([m
+[32m+[m[32m      const [resultado] = await pool.query<ResultSetHeader>([m
+         `[m
+         INSERT INTO configuracion_general ([m
+           nombre_profesional,[m
+[1mdiff --git a/app/api/perfil/upload/route.ts b/app/api/perfil/upload/route.ts[m
+[1mindex fe86b4e..ac97e71 100644[m
+[1m--- a/app/api/perfil/upload/route.ts[m
+[1m+++ b/app/api/perfil/upload/route.ts[m
+[36m@@ -1,10 +1,8 @@[m
+ import { NextResponse } from "next/server";[m
+ import { cookies } from "next/headers";[m
+[31m-import { mkdir, writeFile } from "fs/promises";[m
+[31m-import path from "path";[m
+[31m-import crypto from "crypto";[m
+ [m
+ import { verificarSesion } from "../../../lib/auth";[m
+[32m+[m[32mimport { guardarImagenSubida } from "../../../lib/uploads";[m
+ [m
+ export const runtime = "nodejs";[m
+ [m
+[36m@@ -70,43 +68,7 @@[m [mexport async function POST(request: Request) {[m
+             );[m
+         }[m
+ [m
+[31m-        const extensiones: Record<string, string> = {[m
+[31m-            "image/jpeg": "jpg",[m
+[31m-            "image/png": "png",[m
+[31m-            "image/webp": "webp",[m
+[31m-        };[m
+[31m-[m
+[31m-        const extension = extensiones[archivo.type];[m
+[31m-[m
+[31m-        const nombreArchivo =[m
+[31m-            `${crypto.randomUUID()}.${extension}`;[m
+[31m-[m
+[31m-        const carpeta = path.join([m
+[31m-            process.cwd(),[m
+[31m-            "public",[m
+[31m-            "uploads",[m
+[31m-            "perfil"[m
+[31m-        );[m
+[31m-[m
+[31m-        await mkdir(carpeta, {[m
+[31m-            recursive: true,[m
+[31m-        });[m
+[31m-[m
+[31m-        const bytes = await archivo.arrayBuffer();[m
+[31m-        const buffer = Buffer.from(bytes);[m
+[31m-[m
+[31m-        const rutaArchivo = path.join([m
+[31m-            carpeta,[m
+[31m-            nombreArchivo[m
+[31m-        );[m
+[31m-[m
+[31m-        await writeFile([m
+[31m-            rutaArchivo,[m
+[31m-            buffer[m
+[31m-        );[m
+[31m-[m
+[31m-        const url =[m
+[31m-            `/uploads/perfil/${nombreArchivo}`;[m
+[32m+[m[32m        const { url } = await guardarImagenSubida("perfil", archivo);[m
+ [m
+         return NextResponse.json({[m
+             ok: true,[m
+[1mdiff --git a/app/api/publicaciones/route.ts b/app/api/publicaciones/route.ts[m
+[1mindex 0bbf54b..5e2f445 100644[m
+[1m--- a/app/api/publicaciones/route.ts[m
+[1m+++ b/app/api/publicaciones/route.ts[m
+[36m@@ -1,5 +1,6 @@[m
+ import { NextResponse } from "next/server";[m
+ import { cookies } from "next/headers";[m
+[32m+[m[32mimport type { ResultSetHeader } from "mysql2";[m
+ import pool from "../../lib/db";[m
+ import { verificarSesion } from "../../lib/auth";[m
+ [m
+[36m@@ -132,7 +133,7 @@[m [mexport async function POST(request: Request) {[m
+       fechaFinal = fecha_publicacion || new Date();[m
+     }[m
+ [m
+[31m-    const [resultado]: any = await pool.query([m
+[32m+[m[32m    const [resultado] = await pool.query<ResultSetHeader>([m
+       `[m
+       INSERT INTO publicaciones ([m
+         titulo,[m
+[36m@@ -233,7 +234,7 @@[m [mexport async function PUT(request: Request) {[m
+       fechaFinal = null;[m
+     }[m
+ [m
+[31m-    const [resultado]: any = await pool.query([m
+[32m+[m[32m    const [resultado] = await pool.query<ResultSetHeader>([m
+       `[m
+       UPDATE publicaciones[m
+       SET[m
+[36m@@ -309,7 +310,7 @@[m [mexport async function DELETE(request: Request) {[m
+       );[m
+     }[m
+ [m
+[31m-    const [resultado]: any = await pool.query([m
+[32m+[m[32m    const [resultado] = await pool.query<ResultSetHeader>([m
+       `[m
+       DELETE FROM publicaciones[m
+       WHERE id = ?[m
+[1mdiff --git a/app/api/publicaciones/upload/route.ts b/app/api/publicaciones/upload/route.ts[m
+[1mindex 46713e1..f8a3a1d 100644[m
+[1m--- a/app/api/publicaciones/upload/route.ts[m
+[1m+++ b/app/api/publicaciones/upload/route.ts[m
+[36m@@ -1,10 +1,8 @@[m
+ import { NextResponse } from "next/server";[m
+ import { cookies } from "next/headers";[m
+[31m-import { mkdir, writeFile } from "fs/promises";[m
+[31m-import path from "path";[m
+[31m-import crypto from "crypto";[m
+ [m
+ import { verificarSesion } from "../../../lib/auth";[m
+[32m+[m[32mimport { guardarImagenSubida } from "../../../lib/uploads";[m
+ [m
+ export const runtime = "nodejs";[m
+ [m
+[36m@@ -52,30 +50,11 @@[m [mexport async function POST(request: Request) {[m
+       );[m
+     }[m
+ [m
+[31m-    const extensiones: Record<string, string> = {[m
+[31m-      "image/jpeg": "jpg",[m
+[31m-      "image/png": "png",[m
+[31m-      "image/webp": "webp",[m
+[31m-    };[m
+[31m-    const nombreArchivo = `${crypto.randomUUID()}.${extensiones[archivo.type]}`;[m
+[31m-    const carpeta = path.join([m
+[31m-      process.cwd(),[m
+[31m-      "public",[m
+[31m-      "uploads",[m
+[31m-      "blog"[m
+[31m-    );[m
+[31m-[m
+[31m-    await mkdir(carpeta, { recursive: true });[m
+[31m-[m
+[31m-    const bytes = await archivo.arrayBuffer();[m
+[31m-    await writeFile([m
+[31m-      path.join(carpeta, nombreArchivo),[m
+[31m-      Buffer.from(bytes)[m
+[31m-    );[m
+[32m+[m[32m    const { url } = await guardarImagenSubida("blog", archivo);[m
+ [m
+     return NextResponse.json({[m
+       ok: true,[m
+[31m-      url: `/uploads/blog/${nombreArchivo}`,[m
+[32m+[m[32m      url,[m
+     });[m
+   } catch (error) {[m
+     console.error("Error subiendo imagen del Blog:", error);[m
+[1mdiff --git a/app/api/recordatorio/[id]/cancelar/route.ts b/app/api/recordatorio/[id]/cancelar/route.ts[m
+[1mindex f4fbdc1..44faa81 100644[m
+[1m--- a/app/api/recordatorio/[id]/cancelar/route.ts[m
+[1m+++ b/app/api/recordatorio/[id]/cancelar/route.ts[m
+[36m@@ -1,4 +1,5 @@[m
+ import { NextResponse } from "next/server";[m
+[32m+[m[32mimport type { ResultSetHeader } from "mysql2";[m
+ import pool from "@/app/lib/db";[m
+ import { enviarCorreo } from "@/app/lib/email";[m
+ import {[m
+[36m@@ -35,7 +36,7 @@[m [mexport async function POST([m
+  [m
+     // Cancelar solo si sigue CONFIRMADA (evita doble cancelación).[m
+     // Se invalida el token para que el enlace no se pueda reutilizar.[m
+[31m-    const [actualizacion]: any = await pool.query([m
+[32m+[m[32m    const [actualizacion] = await pool.query<ResultSetHeader>([m
+       `[m
+         UPDATE citas[m
+         SET estado = 'CANCELADA',[m
+[1mdiff --git a/app/api/recordatorio/[id]/confirmar/route.ts b/app/api/recordatorio/[id]/confirmar/route.ts[m
+[1mindex 159703b..3fb601f 100644[m
+[1m--- a/app/api/recordatorio/[id]/confirmar/route.ts[m
+[1m+++ b/app/api/recordatorio/[id]/confirmar/route.ts[m
+[36m@@ -1,5 +1,6 @@[m
+  import { NextResponse } from "next/server";[m
+         import crypto from "crypto";[m
+[32m+[m[32m        import type { RowDataPacket, ResultSetHeader } from "mysql2";[m
+         import pool from "@/app/lib/db";[m
+         import { enviarCorreo } from "@/app/lib/email";[m
+ [m
+[36m@@ -86,7 +87,7 @@[m
+             );[m
+             }[m
+ [m
+[31m-            const [filas]: any = await pool.query([m
+[32m+[m[32m            const [filas] = await pool.query<RowDataPacket[]>([m
+             `[m
+                 SELECT[m
+                 c.id,[m
+[36m@@ -173,7 +174,7 @@[m
+ [m
+             // Actualizar solamente si aún no se ha confirmado.[m
+             // El estado de la cita permanece CONFIRMADA.[m
+[31m-            const [resultado]: any = await pool.query([m
+[32m+[m[32m            const [resultado] = await pool.query<ResultSetHeader>([m
+             `[m
+                 UPDATE citas[m
+                 SET asistencia_confirmada = 1[m
+[1mdiff --git a/app/api/recordatorio/[id]/reprogramar/route.ts b/app/api/recordatorio/[id]/reprogramar/route.ts[m
+[1mindex 2d0475e..44e7ae1 100644[m
+[1m--- a/app/api/recordatorio/[id]/reprogramar/route.ts[m
+[1m+++ b/app/api/recordatorio/[id]/reprogramar/route.ts[m
+[36m@@ -1,4 +1,5 @@[m
+ import { NextResponse } from "next/server";[m
+[32m+[m[32mimport type { ResultSetHeader } from "mysql2";[m
+ import pool from "@/app/lib/db";[m
+ import { enviarCorreo } from "@/app/lib/email";[m
+ import { obtenerHorasDisponibles } from "@/app/lib/disponibilidad";[m
+[36m@@ -81,7 +82,7 @@[m [mexport async function POST([m
+  [m
+     // Se reinician confirmación y recordatorio para la nueva fecha,[m
+     // y se invalida el token del correo anterior.[m
+[31m-    const [actualizacion]: any = await pool.query([m
+[32m+[m[32m    const [actualizacion] = await pool.query<ResultSetHeader>([m
+       `[m
+         UPDATE citas[m
+         SET fecha = ?,[m
+[1mdiff --git a/app/api/recordatorios/12-horas/route.ts b/app/api/recordatorios/12-horas/route.ts[m
+[1mindex c031fd1..a4598a0 100644[m
+[1m--- a/app/api/recordatorios/12-horas/route.ts[m
+[1m+++ b/app/api/recordatorios/12-horas/route.ts[m
+[36m@@ -1,5 +1,6 @@[m
+ import { NextResponse } from "next/server";[m
+ import crypto from "crypto";[m
+[32m+[m[32mimport type { RowDataPacket } from "mysql2";[m
+ import pool from "../../../lib/db";[m
+ import { enviarCorreo } from "../../../lib/email";[m
+ [m
+[36m@@ -8,6 +9,9 @@[m [mimport { enviarCorreo } from "../../../lib/email";[m
+ // ======================================================[m
+ [m
+ export const runtime = "nodejs";[m
+[32m+[m[32m// Envío de hasta N correos por ejecución; el host[m
+[32m+[m[32m// debe respetar el límite (VPS con `next start`).[m
+[32m+[m[32mexport const maxDuration = 300;[m
+ [m
+ // ======================================================[m
+ // VALIDAR CLAVE DEL PROCESO AUTOMÁTICO[m
+[36m@@ -185,7 +189,7 @@[m [mexport async function GET(request: Request) {[m
+     // BUSCAR CITAS CONFIRMADAS[m
+     // ----------------------------------------------------[m
+ [m
+[31m-    const [citas]: any = await pool.query([m
+[32m+[m[32m    const [citas] = await pool.query<RowDataPacket[]>([m
+       `[m
+         SELECT[m
+           c.id,[m
+[36m@@ -237,7 +241,7 @@[m [mif (dryRun) {[m
+     encontradas: citas.length,[m
+     correosEnviados: 0,[m
+     registrosModificados: 0,[m
+[31m-    citas: citas.map((cita: any) => ({[m
+[32m+[m[32m    citas: citas.map((cita: RowDataPacket) => ({[m
+       id: cita.id,[m
+       fecha: formatearFecha(cita.fecha),[m
+       hora: formatearHora(cita.hora),[m
+[1mdiff --git a/app/api/recordatorios/testimonios/route.ts b/app/api/recordatorios/testimonios/route.ts[m
+[1mindex 574bb77..90ec51e 100644[m
+[1m--- a/app/api/recordatorios/testimonios/route.ts[m
+[1m+++ b/app/api/recordatorios/testimonios/route.ts[m
+[36m@@ -5,10 +5,13 @@[m [mimport {[m
+   timingSafeEqual,[m
+ } from "crypto";[m
+ [m
+[32m+[m[32mimport type { RowDataPacket, ResultSetHeader } from "mysql2";[m
+[32m+[m
+ import pool from "../../../lib/db";[m
+ import { enviarCorreo } from "../../../lib/email";[m
+ [m
+ export const runtime = "nodejs";[m
+[32m+[m[32mexport const maxDuration = 300;[m
+ [m
+ // ======================================================[m
+ // AUTORIZACIÓN DEL PROCESO AUTOMÁTICO[m
+[36m@@ -135,7 +138,7 @@[m [mexport async function GET(request: Request) {[m
+     // Buscar citas completadas cuya duración ya terminó.[m
+     // La solicitud única por cita evita duplicar invitaciones.[m
+ [m
+[31m-    const [citas]: any = await pool.query([m
+[32m+[m[32m    const [citas] = await pool.query<RowDataPacket[]>([m
+       `[m
+         SELECT[m
+           c.id AS cita_id,[m
+[36m@@ -181,7 +184,7 @@[m [mexport async function GET(request: Request) {[m
+         encontradas: citas.length,[m
+         correosEnviados: 0,[m
+         registrosCreados: 0,[m
+[31m-        citas: citas.map((cita: any) => ({[m
+[32m+[m[32m        citas: citas.map((cita: RowDataPacket) => ({[m
+           cita_id: cita.cita_id,[m
+           fecha: formatearFecha(cita.fecha),[m
+           hora: String(cita.hora).slice(0, 5),[m
+[36m@@ -231,10 +234,8 @@[m [mexport async function GET(request: Request) {[m
+         // solicitudes duplicadas, incluso si se ejecuta[m
+         // el proceso más de una vez.[m
+ [m
+[31m-        let resultadoInsert: any;[m
+[31m-[m
+         try {[m
+[31m-          const [resultado]: any = await pool.query([m
+[32m+[m[32m          await pool.query<ResultSetHeader>([m
+             `[m
+               INSERT INTO solicitudes_testimonio ([m
+                 cita_id,[m
+[36m@@ -254,11 +255,13 @@[m [mexport async function GET(request: Request) {[m
+             [cita.cita_id, tokenHash][m
+           );[m
+ [m
+[31m-          resultadoInsert = resultado;[m
+           solicitudCreada = true;[m
+[31m-        } catch (error: any) {[m
+[32m+[m[32m        } catch (error) {[m
+           // Error MySQL 1062 = entrada duplicada.[m
+[31m-          if (error?.code === "ER_DUP_ENTRY") {[m
+[32m+[m[32m          if ([m
+[32m+[m[32m            (error as Record<string, unknown>)?.code ===[m
+[32m+[m[32m            "ER_DUP_ENTRY"[m
+[32m+[m[32m          ) {[m
+             omitidas++;[m
+             continue;[m
+           }[m
+[36m@@ -413,7 +416,7 @@[m [mexport async function GET(request: Request) {[m
+         );[m
+ [m
+         enviadas++;[m
+[31m-      } catch (error: any) {[m
+[32m+[m[32m      } catch (error) {[m
+         console.error([m
+           `Error procesando el testimonio de la cita ${cita.cita_id}:`,[m
+           error[m
+[36m@@ -437,8 +440,10 @@[m [mexport async function GET(request: Request) {[m
+                   AND estado = 'PENDIENTE'[m
+               `,[m
+               [[m
+[31m-                String(error?.message || "Error al enviar el correo.")[m
+[31m-                  .slice(0, 1000),[m
+[32m+[m[32m                String([m
+[32m+[m[32m                  (error as Record<string, unknown>)?.message ||[m
+[32m+[m[32m                    "Error al enviar el correo."[m
+[32m+[m[32m                ).slice(0, 1000),[m
+                 cita.cita_id,[m
+               ][m
+             );[m
+[1mdiff --git a/app/api/servicios/route.ts b/app/api/servicios/route.ts[m
+[1mindex 0fd7fc7..915b227 100644[m
+[1m--- a/app/api/servicios/route.ts[m
+[1m+++ b/app/api/servicios/route.ts[m
+[36m@@ -1,5 +1,6 @@[m
+ import { NextResponse } from "next/server";[m
+ import { cookies } from "next/headers";[m
+[32m+[m[32mimport type { ResultSetHeader } from "mysql2";[m
+ import pool from "../../lib/db";[m
+ import { verificarSesion } from "../../lib/auth";[m
+ [m
+[36m@@ -121,7 +122,7 @@[m [mexport async function POST(request: Request) {[m
+       );[m
+     }[m
+ [m
+[31m-    const [resultado]: any = await pool.query([m
+[32m+[m[32m    const [resultado] = await pool.query<ResultSetHeader>([m
+       `[m
+       INSERT INTO servicios ([m
+         nombre,[m
+[36m@@ -243,7 +244,7 @@[m [mexport async function PUT(request: Request) {[m
+       );[m
+     }[m
+ [m
+[31m-    const [resultado]: any = await pool.query([m
+[32m+[m[32m    const [resultado] = await pool.query<ResultSetHeader>([m
+       `[m
+       UPDATE servicios[m
+       SET[m
+[36m@@ -311,7 +312,7 @@[m [mexport async function DELETE(request: Request) {[m
+       );[m
+     }[m
+ [m
+[31m-    const [resultado]: any = await pool.query([m
+[32m+[m[32m    const [resultado] = await pool.query<ResultSetHeader>([m
+       `[m
+       UPDATE servicios[m
+       SET activo = 0[m
+[1mdiff --git a/app/api/testimonio/[token]/route.ts b/app/api/testimonio/[token]/route.ts[m
+[1mindex 60e913e..11ba03d 100644[m
+[1m--- a/app/api/testimonio/[token]/route.ts[m
+[1m+++ b/app/api/testimonio/[token]/route.ts[m
+[36m@@ -1,4 +1,5 @@[m
+ import { NextResponse } from "next/server";[m
+[32m+[m[32mimport type { ResultSetHeader } from "mysql2";[m
+ import pool from "@/app/lib/db";[m
+ import { obtenerSolicitudValidada } from "@/app/lib/testimonio";[m
+  [m
+[36m@@ -94,7 +95,7 @@[m [mexport async function POST([m
+     // Si dos pestañas envían el formulario al mismo tiempo,[m
+     // solo una va a lograr este UPDATE — evita testimonios[m
+     // duplicados por una misma invitación.[m
+[31m-    const [actualizacion]: any = await pool.query([m
+[32m+[m[32m    const [actualizacion] = await pool.query<ResultSetHeader>([m
+       `[m
+         UPDATE solicitudes_testimonio[m
+         SET estado = 'RESPONDIDA',[m
+[1mdiff --git a/app/api/testimonios/[token]/route.ts b/app/api/testimonios/[token]/route.ts[m
+[1mindex 7031a22..e422613 100644[m
+[1m--- a/app/api/testimonios/[token]/route.ts[m
+[1m+++ b/app/api/testimonios/[token]/route.ts[m
+[36m@@ -1,4 +1,5 @@[m
+ import { NextResponse } from "next/server";[m
+[32m+[m[32mimport type { ResultSetHeader } from "mysql2";[m
+ import pool from "@/app/lib/db";[m
+ import { obtenerSolicitudValidada } from "@/app/lib/testimonio";[m
+  [m
+[36m@@ -94,7 +95,7 @@[m [mexport async function POST([m
+     // Si dos pestañas envían el formulario al mismo tiempo,[m
+     // solo una va a lograr este UPDATE — evita testimonios[m
+     // duplicados por una misma invitación.[m
+[31m-    const [actualizacion]: any = await pool.query([m
+[32m+[m[32m    const [actualizacion] = await pool.query<ResultSetHeader>([m
+       `[m
+         UPDATE solicitudes_testimonio[m
+         SET estado = 'RESPONDIDA',[m
+[1mdiff --git a/app/api/testimonios/route.ts b/app/api/testimonios/route.ts[m
+[1mindex 3426661..72c3d19 100644[m
+[1m--- a/app/api/testimonios/route.ts[m
+[1m+++ b/app/api/testimonios/route.ts[m
+[36m@@ -1,5 +1,6 @@[m
+ import { NextResponse } from "next/server";[m
+ import { cookies } from "next/headers";[m
+[32m+[m[32mimport type { ResultSetHeader } from "mysql2";[m
+ import pool from "../../lib/db";[m
+ import { verificarSesion } from "../../lib/auth";[m
+ [m
+[36m@@ -137,7 +138,7 @@[m [mexport async function POST(request: Request) {[m
+       );[m
+     }[m
+ [m
+[31m-    const [resultado]: any = await pool.query([m
+[32m+[m[32m    const [resultado] = await pool.query<ResultSetHeader>([m
+       `[m
+       INSERT INTO testimonios ([m
+         nombre,[m
+[36m@@ -229,7 +230,7 @@[m [mexport async function PUT(request: Request) {[m
+       );[m
+     }[m
+ [m
+[31m-    const [resultado]: any = await pool.query([m
+[32m+[m[32m    const [resultado] = await pool.query<ResultSetHeader>([m
+       `[m
+       UPDATE testimonios[m
+       SET[m
+[36m@@ -310,7 +311,7 @@[m [mexport async function DELETE(request: Request) {[m
+     // Se pide explícitamente con accion: "borrar"; si no se envía,[m
+     // se mantiene el comportamiento de siempre (solo lo retira).[m
+     if (accion === "borrar") {[m
+[31m-      const [resultadoBorrado]: any = await pool.query([m
+[32m+[m[32m      const [resultadoBorrado] = await pool.query<ResultSetHeader>([m
+         `[m
+         DELETE FROM testimonios[m
+         WHERE id = ?[m
+[36m@@ -333,7 +334,7 @@[m [mexport async function DELETE(request: Request) {[m
+       });[m
+     }[m
+ [m
+[31m-    const [resultado]: any = await pool.query([m
+[32m+[m[32m    const [resultado] = await pool.query<ResultSetHeader>([m
+       `[m
+       UPDATE testimonios[m
+       SET publicado = 0[m
+[1mdiff --git a/app/api/trayectoria/route.ts b/app/api/trayectoria/route.ts[m
+[1mindex e14ba62..aa202ed 100644[m
+[1m--- a/app/api/trayectoria/route.ts[m
+[1m+++ b/app/api/trayectoria/route.ts[m
+[36m@@ -1,5 +1,6 @@[m
+ import { NextResponse } from "next/server";[m
+ import { cookies } from "next/headers";[m
+[32m+[m[32mimport type { ResultSetHeader } from "mysql2";[m
+ import pool from "../../lib/db";[m
+ import { verificarSesion } from "../../lib/auth";[m
+ [m
+[36m@@ -96,7 +97,7 @@[m [mexport async function POST(request: Request) {[m
+       );[m
+     }[m
+ [m
+[31m-    const [resultado]: any = await pool.query([m
+[32m+[m[32m    const [resultado] = await pool.query<ResultSetHeader>([m
+       `[m
+       INSERT INTO trayectoria ([m
+         tipo,[m
+[36m@@ -196,7 +197,7 @@[m [mexport async function PUT(request: Request) {[m
+       );[m
+     }[m
+ [m
+[31m-    const [resultado]: any = await pool.query([m
+[32m+[m[32m    const [resultado] = await pool.query<ResultSetHeader>([m
+       `[m
+       UPDATE trayectoria[m
+       SET[m
+[36m@@ -274,7 +275,7 @@[m [mexport async function DELETE(request: Request) {[m
+       );[m
+     }[m
+ [m
+[31m-    const [resultado]: any = await pool.query([m
+[32m+[m[32m    const [resultado] = await pool.query<ResultSetHeader>([m
+       `[m
+       UPDATE trayectoria[m
+       SET activo = 0[m
+[1mdiff --git a/app/api/trayectoria/upload/route.ts b/app/api/trayectoria/upload/route.ts[m
+[1mindex 703eba7..07f20c9 100644[m
+[1m--- a/app/api/trayectoria/upload/route.ts[m
+[1m+++ b/app/api/trayectoria/upload/route.ts[m
+[36m@@ -1,10 +1,8 @@[m
+ import { NextResponse } from "next/server";[m
+ import { cookies } from "next/headers";[m
+[31m-import { mkdir, writeFile } from "fs/promises";[m
+[31m-import path from "path";[m
+[31m-import crypto from "crypto";[m
+ [m
+ import { verificarSesion } from "../../../lib/auth";[m
+[32m+[m[32mimport { guardarImagenSubida } from "../../../lib/uploads";[m
+ [m
+ export const runtime = "nodejs";[m
+ [m
+[36m@@ -74,49 +72,7 @@[m [mexport async function POST(request: Request) {[m
+             );[m
+         }[m
+ [m
+[31m-        // Extensión según el tipo de imagen[m
+[31m-        const extensiones: Record<string, string> = {[m
+[31m-            "image/jpeg": "jpg",[m
+[31m-            "image/png": "png",[m
+[31m-            "image/webp": "webp",[m
+[31m-        };[m
+[31m-[m
+[31m-        const extension = extensiones[archivo.type];[m
+[31m-[m
+[31m-        // Nombre único para evitar conflictos[m
+[31m-        const nombreArchivo =[m
+[31m-            `${crypto.randomUUID()}.${extension}`;[m
+[31m-[m
+[31m-        // Crear carpeta[m
+[31m-        const carpeta = path.join([m
+[31m-            process.cwd(),[m
+[31m-            "public",[m
+[31m-            "uploads",[m
+[31m-            "trayectoria"[m
+[31m-        );[m
+[31m-[m
+[31m-        await mkdir(carpeta, {[m
+[31m-            recursive: true,[m
+[31m-        });[m
+[31m-[m
+[31m-        // Convertir archivo[m
+[31m-        const bytes = await archivo.arrayBuffer();[m
+[31m-        const buffer = Buffer.from(bytes);[m
+[31m-[m
+[31m-        // Guardar físicamente[m
+[31m-        const rutaArchivo = path.join([m
+[31m-            carpeta,[m
+[31m-            nombreArchivo[m
+[31m-        );[m
+[31m-[m
+[31m-        await writeFile([m
+[31m-            rutaArchivo,[m
+[31m-            buffer[m
+[31m-        );[m
+[31m-[m
+[31m-        // Ruta pública[m
+[31m-        const url =[m
+[31m-            `/uploads/trayectoria/${nombreArchivo}`;[m
+[32m+[m[32m        const { url } = await guardarImagenSubida("trayectoria", archivo);[m
+ [m
+         return NextResponse.json({[m
+             ok: true,[m
+[1mdiff --git a/app/api/wompi/webhook/route.ts b/app/api/wompi/webhook/route.ts[m
+[1mindex 98e2cff..d81fe58 100644[m
+[1m--- a/app/api/wompi/webhook/route.ts[m
+[1m+++ b/app/api/wompi/webhook/route.ts[m
+[36m@@ -1,10 +1,17 @@[m
+ import { NextResponse } from "next/server";[m
+ import crypto from "crypto";[m
+[32m+[m[32mimport type { RowDataPacket } from "mysql2";[m
+ [m
+ import pool from "../../../lib/db";[m
+ import { enviarCorreo } from "../../../lib/email";[m
+ import { crearEventoGoogleCalendar } from "../../../lib/google-calendar";[m
+ [m
+[32m+[m[32m// El proceso es largo (Calendar + correos).[m
+[32m+[m[32m// En un VPS con `next start` este límite aplica[m
+[32m+[m[32m// por request; ajusta según el host.[m
+[32m+[m[32mexport const runtime = "nodejs";[m
+[32m+[m[32mexport const maxDuration = 60;[m
+[32m+[m
+ // ======================================================[m
+ // TIPOS WOMPI[m
+ // ======================================================[m
+[36m@@ -38,19 +45,19 @@[m [mtype WompiEvent = {[m
+ // ======================================================[m
+ [m
+ function obtenerValorPorRuta([m
+[31m-  objeto: Record<string, any>,[m
+[32m+[m[32m  objeto: Record<string, unknown>,[m
+   ruta: string[m
+ ): unknown {[m
+   const partes = ruta.split(".");[m
+ [m
+[31m-  let valor: any = objeto;[m
+[32m+[m[32m  let valor: unknown = objeto;[m
+ [m
+   for (const parte of partes) {[m
+     if (valor === null || valor === undefined) {[m
+       return undefined;[m
+     }[m
+ [m
+[31m-    valor = valor[parte];[m
+[32m+[m[32m    valor = (valor as Record<string, unknown>)[parte];[m
+   }[m
+ [m
+   return valor;[m
+[36m@@ -88,7 +95,7 @@[m [mfunction compararFirmas([m
+ // FORMATEAR FECHA[m
+ // ======================================================[m
+ [m
+[31m-function formatearFecha(fecha: any): string {[m
+[32m+[m[32mfunction formatearFecha(fecha: string | Date): string {[m
+   try {[m
+     const fechaObjeto =[m
+       fecha instanceof Date[m
+[36m@@ -108,7 +115,7 @@[m [mfunction formatearFecha(fecha: any): string {[m
+ // FORMATEAR HORA[m
+ // ======================================================[m
+ [m
+[31m-function formatearHora(hora: any): string {[m
+[32m+[m[32mfunction formatearHora(hora: string): string {[m
+   if (!hora) {[m
+     return "";[m
+   }[m
+[36m@@ -183,8 +190,8 @@[m [masync function enviarCorreosConfirmacion({[m
+   emailCliente: string;[m
+   emailAdministradora: string | null;[m
+   servicio: string;[m
+[31m-  fecha: any;[m
+[31m-  hora: any;[m
+[32m+[m[32m  fecha: string | Date;[m
+[32m+[m[32m  hora: string;[m
+   modalidad: string;[m
+   monto: number;[m
+   referencia: string;[m
+[36m@@ -731,7 +738,7 @@[m [masync function enviarCorreosConfirmacion({[m
+     });[m
+ [m
+     console.log([m
+[31m-      `Correo de confirmación enviado al paciente: ${emailCliente}`[m
+[32m+[m[32m      "Correo de confirmación enviado al paciente."[m
+     );[m
+   } catch (error) {[m
+     console.error([m
+[36m@@ -754,7 +761,7 @@[m [masync function enviarCorreosConfirmacion({[m
+       });[m
+ [m
+       console.log([m
+[31m-        `Correo de nueva cita enviado a la administradora: ${emailAdministradora}`[m
+[32m+[m[32m        "Correo de nueva cita enviado a la administradora."[m
+       );[m
+     } catch (error) {[m
+       console.error([m
+[36m@@ -843,7 +850,7 @@[m [mexport async function POST(request: Request) {[m
+     for (const propiedad of propiedades) {[m
+       const valor =[m
+         obtenerValorPorRuta([m
+[31m-          evento.data as Record<string, any>,[m
+[32m+[m[32m          evento.data as Record<string, unknown>,[m
+           propiedad[m
+         );[m
+ [m
+[36m@@ -968,8 +975,8 @@[m [mexport async function POST(request: Request) {[m
+         | string[m
+         | null;[m
+         servicio: string;[m
+[31m-        fecha: any;[m
+[31m-        hora: any;[m
+[32m+[m[32m        fecha: string | Date;[m
+[32m+[m[32m        hora: string;[m
+         modalidad: string;[m
+         monto: number;[m
+         referencia: string;[m
+[36m@@ -1000,8 +1007,8 @@[m [mexport async function POST(request: Request) {[m
+       // BUSCAR PAGO + CITA + CLIENTE + SERVICIO[m
+       // =================================================[m
+ [m
+[31m-      const [pagos]: any =[m
+[31m-        await conexion.query([m
+[32m+[m[32m      const [pagos] =[m
+[32m+[m[32m        await conexion.query<RowDataPacket[]>([m
+           `[m
+           SELECT[m
+             p.id,[m
+[36m@@ -1037,6 +1044,8 @@[m [mexport async function POST(request: Request) {[m
+           WHERE p.referencia = ?[m
+ [m
+           LIMIT 1[m
+[32m+[m
+[32m+[m[32m          FOR UPDATE[m
+           `,[m
+           [referencia][m
+         );[m
+[36m@@ -1062,6 +1071,63 @@[m [mexport async function POST(request: Request) {[m
+ [m
+       const pago = pagos[0];[m
+ [m
+[32m+[m[32m      // =================================================[m
+[32m+[m[32m      // IDEMPOTENCIA POR TRANSACCION_ID[m
+[32m+[m[32m      // =================================================[m
+[32m+[m[32m      // Wompi reenvía eventos. Si esta transacción ya fue[m
+[32m+[m[32m      // procesada para el mismo pago, respondemos idempotente[m
+[32m+[m[32m      // sin re-procesar (evita Meet y correos duplicados).[m
+[32m+[m[32m      if ([m
+[32m+[m[32m        pago.transaccion_id === transaccionId &&[m
+[32m+[m[32m        pago.estado === "APROBADO"[m
+[32m+[m[32m      ) {[m
+[32m+[m[32m        await conexion.rollback();[m
+[32m+[m
+[32m+[m[32m        console.log([m
+[32m+[m[32m          `Webhook Wompi idempotente: transacción ${transaccionId} ya procesada.`[m
+[32m+[m[32m        );[m
+[32m+[m
+[32m+[m[32m        return NextResponse.json({[m
+[32m+[m[32m          recibido: true,[m
+[32m+[m[32m          procesado: true,[m
+[32m+[m[32m          idempotente: true,[m
+[32m+[m[32m          referencia,[m
+[32m+[m[32m          estado_wompi: status,[m
+[32m+[m[32m          estado_pago: "APROBADO",[m
+[32m+[m[32m          estado_cita: "CONFIRMADA",[m
+[32m+[m[32m          notificaciones_enviadas: false,[m
+[32m+[m[32m        });[m
+[32m+[m[32m      }[m
+[32m+[m
+[32m+[m[32m      // La transacción no puede estar asociada a otro pago.[m
+[32m+[m[32m      const [transaccionesExistentes] =[m
+[32m+[m[32m        await conexion.query<RowDataPacket[]>([m
+[32m+[m[32m          `[m
+[32m+[m[32m          SELECT id[m
+[32m+[m[32m          FROM pagos[m
+[32m+[m[32m          WHERE transaccion_id = ?[m
+[32m+[m[32m            AND id <> ?[m
+[32m+[m[32m          LIMIT 1[m
+[32m+[m[32m          `,[m
+[32m+[m[32m          [transaccionId, pago.id][m
+[32m+[m[32m        );[m
+[32m+[m
+[32m+[m[32m      if (transaccionesExistentes.length > 0) {[m
+[32m+[m[32m        await conexion.rollback();[m
+[32m+[m
+[32m+[m[32m        console.warn([m
+[32m+[m[32m          "Wompi envió una transacción que ya está asociada a otro pago.",[m
+[32m+[m[32m          { referencia }[m
+[32m+[m[32m        );[m
+[32m+[m
+[32m+[m[32m        return NextResponse.json([m
+[32m+[m[32m          {[m
+[32m+[m[32m            error: "La transacción ya está asociada a otro pago.",[m
+[32m+[m[32m          },[m
+[32m+[m[32m          { status: 409 }[m
+[32m+[m[32m        );[m
+[32m+[m[32m      }[m
+[32m+[m
+       // =================================================[m
+       // VALIDAR MONTO Y MONEDA[m
+       // =================================================[m
+[36m@@ -1244,8 +1310,8 @@[m [mexport async function POST(request: Request) {[m
+         // OBTENER EMAIL DE LA ADMINISTRADORA[m
+         // ===============================================[m
+ [m
+[31m-        const [administradores]: any =[m
+[31m-          await conexion.query([m
+[32m+[m[32m        const [administradores] =[m
+[32m+[m[32m          await conexion.query<RowDataPacket[]>([m
+             `[m
+             SELECT email[m
+             FROM administradores[m
+[36m@@ -1258,8 +1324,8 @@[m [mexport async function POST(request: Request) {[m
+         // OBTENER DIRECCIÓN[m
+         // ===============================================[m
+ [m
+[31m-        const [configuraciones]: any =[m
+[31m-          await conexion.query([m
+[32m+[m[32m        const [configuraciones] =[m
+[32m+[m[32m          await conexion.query<RowDataPacket[]>([m
+             `[m
+             SELECT direccion[m
+             FROM configuracion_general[m
+[1mdiff --git a/app/blog/[id]/page.tsx b/app/blog/[id]/page.tsx[m
+[1mindex b03435e..ff42986 100644[m
+[1m--- a/app/blog/[id]/page.tsx[m
+[1m+++ b/app/blog/[id]/page.tsx[m
+[36m@@ -1,16 +1,10 @@[m
+ import Link from "next/link";[m
+[32m+[m[32mimport {[m
+[32m+[m[32m  obtenerPublicacionPublica,[m
+[32m+[m[32m  type PublicacionPublica,[m
+[32m+[m[32m} from "../../lib/contenido-publico";[m
+ [m
+[31m-interface Publicacion {[m
+[31m-  id: number;[m
+[31m-  titulo: string;[m
+[31m-  resumen: string | null;[m
+[31m-  contenido: string;[m
+[31m-  imagen_url: string | null;[m
+[31m-  estado: "BORRADOR" | "PUBLICADO";[m
+[31m-  fecha_publicacion: string | null;[m
+[31m-  creado_en: string;[m
+[31m-  actualizado_en: string;[m
+[31m-}[m
+[32m+[m[32mexport const dynamic = "force-dynamic";[m
+ [m
+ interface Props {[m
+   params: Promise<{[m
+[36m@@ -20,27 +14,12 @@[m [minterface Props {[m
+ [m
+ async function obtenerPublicacion([m
+   id: string[m
+[31m-): Promise<Publicacion | null> {[m
+[32m+[m[32m): Promise<PublicacionPublica | null> {[m
+   try {[m
+[31m-    const respuesta = await fetch([m
+[31m-      `http://localhost:3000/api/publicaciones`,[m
+[31m-      {[m
+[31m-        cache: "no-store",[m
+[31m-      }[m
+[31m-    );[m
+[31m-[m
+[31m-    if (!respuesta.ok) {[m
+[31m-      return null;[m
+[31m-    }[m
+[31m-[m
+[31m-    const publicaciones: Publicacion[] =[m
+[31m-      await respuesta.json();[m
+[31m-[m
+[31m-    const publicacion = publicaciones.find([m
+[31m-      (item) => String(item.id) === id[m
+[31m-    );[m
+[31m-[m
+[31m-    return publicacion || null;[m
+[32m+[m[32m    // Lectura directa desde MySQL en el Server Component.[m
+[32m+[m[32m    // Nunca hacer fetch a localhost en runtime: en el host[m
+[32m+[m[32m    // de producción esas rutas no existen.[m
+[32m+[m[32m    return await obtenerPublicacionPublica(id);[m
+   } catch (error) {[m
+     console.error([m
+       "Error obteniendo publicación:",[m
+[1mdiff --git a/app/cambiar-password/page.tsx b/app/cambiar-password/page.tsx[m
+[1mindex f692b20..d36915b 100644[m
+[1m--- a/app/cambiar-password/page.tsx[m
+[1m+++ b/app/cambiar-password/page.tsx[m
+[36m@@ -1,6 +1,7 @@[m
+ "use client";[m
+ [m
+ import { FormEvent, useState } from "react";[m
+[32m+[m[32mimport Link from "next/link";[m
+ [m
+ export default function CambiarPasswordPage() {[m
+     const [passwordActual, setPasswordActual] = useState("");[m
+[36m@@ -312,12 +313,12 @@[m [mexport default function CambiarPasswordPage() {[m
+ [m
+                     {/* VOLVER */}[m
+                     <div className="mt-6 text-center">[m
+[31m-                        <a[m
+[32m+[m[32m                        <Link[m
+                             href="/"[m
+                             className="text-sm text-[#707469] transition hover:text-[#C56835]"[m
+                         >[m
+                             ← Volver al sitio web[m
+[31m-                        </a>[m
+[32m+[m[32m                        </Link>[m
+                     </div>[m
+                 </section>[m
+             </div>[m
+[1mdiff --git a/app/lib/app-url.ts b/app/lib/app-url.ts[m
+[1mnew file mode 100644[m
+[1mindex 0000000..eb6d784[m
+[1m--- /dev/null[m
+[1m+++ b/app/lib/app-url.ts[m
+[36m@@ -0,0 +1,13 @@[m
+[32m+[m[32mexport function obtenerAppUrl(): string {[m
+[32m+[m[32m  const url = process.env.APP_URL?.replace(/\/+$/, "");[m
+[32m+[m
+[32m+[m[32m  if (url) {[m
+[32m+[m[32m    return url;[m
+[32m+[m[32m  }[m
+[32m+[m
+[32m+[m[32m  if (process.env.NODE_ENV === "production") {[m
+[32m+[m[32m    throw new Error("APP_URL no está configurada.");[m
+[32m+[m[32m  }[m
+[32m+[m
+[32m+[m[32m  return "http://localhost:3000";[m
+[32m+[m[32m}[m
+[1mdiff --git a/app/lib/contenido-publico.ts b/app/lib/contenido-publico.ts[m
+[1mnew file mode 100644[m
+[1mindex 0000000..a922727[m
+[1m--- /dev/null[m
+[1m+++ b/app/lib/contenido-publico.ts[m
+[36m@@ -0,0 +1,140 @@[m
+[32m+[m[32mimport type { RowDataPacket } from "mysql2";[m
+[32m+[m[32mimport pool from "./db";[m
+[32m+[m
+[32m+[m[32mexport interface PublicacionPublica extends RowDataPacket {[m
+[32m+[m[32m  id: number;[m
+[32m+[m[32m  titulo: string;[m
+[32m+[m[32m  resumen: string | null;[m
+[32m+[m[32m  contenido: string;[m
+[32m+[m[32m  imagen_url: string | null;[m
+[32m+[m[32m  estado: "BORRADOR" | "PUBLICADO";[m
+[32m+[m[32m  fecha_publicacion: string | null;[m
+[32m+[m[32m  creado_en: string;[m
+[32m+[m[32m  actualizado_en: string;[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mexport async function obtenerPerfilPublico() {[m
+[32m+[m[32m  const [filas] = await pool.query<RowDataPacket[]>(`[m
+[32m+[m[32m    SELECT[m
+[32m+[m[32m      id,[m
+[32m+[m[32m      nombre_profesional,[m
+[32m+[m[32m      profesion,[m
+[32m+[m[32m      descripcion,[m
+[32m+[m[32m      foto_url,[m
+[32m+[m[32m      logo_url,[m
+[32m+[m[32m      whatsapp,[m
+[32m+[m[32m      correo,[m
+[32m+[m[32m      direccion,[m
+[32m+[m[32m      actualizado_en[m
+[32m+[m[32m    FROM configuracion_general[m
+[32m+[m[32m    ORDER BY id ASC[m
+[32m+[m[32m    LIMIT 1[m
+[32m+[m[32m  `);[m
+[32m+[m
+[32m+[m[32m  return filas[0] || null;[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mexport async function obtenerServiciosPublicos() {[m
+[32m+[m[32m  const [filas] = await pool.query<RowDataPacket[]>(`[m
+[32m+[m[32m    SELECT[m
+[32m+[m[32m      id,[m
+[32m+[m[32m      nombre,[m
+[32m+[m[32m      descripcion,[m
+[32m+[m[32m      tipo_servicio,[m
+[32m+[m[32m      precio,[m
+[32m+[m[32m      duracion_minutos,[m
+[32m+[m[32m      modalidad,[m
+[32m+[m[32m      activo,[m
+[32m+[m[32m      creado_en,[m
+[32m+[m[32m      actualizado_en[m
+[32m+[m[32m    FROM servicios[m
+[32m+[m[32m    WHERE activo = 1[m
+[32m+[m[32m    ORDER BY id DESC[m
+[32m+[m[32m  `);[m
+[32m+[m
+[32m+[m[32m  return filas;[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mexport async function obtenerTrayectoriaPublica() {[m
+[32m+[m[32m  const [filas] = await pool.query<RowDataPacket[]>(`[m
+[32m+[m[32m    SELECT[m
+[32m+[m[32m      id,[m
+[32m+[m[32m      tipo,[m
+[32m+[m[32m      titulo,[m
+[32m+[m[32m      institucion,[m
+[32m+[m[32m      descripcion,[m
+[32m+[m[32m      fecha_inicio,[m
+[32m+[m[32m      fecha_fin,[m
+[32m+[m[32m      imagen_url,[m
+[32m+[m[32m      orden,[m
+[32m+[m[32m      activo,[m
+[32m+[m[32m      creado_en,[m
+[32m+[m[32m      actualizado_en[m
+[32m+[m[32m    FROM trayectoria[m
+[32m+[m[32m    WHERE activo = 1[m
+[32m+[m[32m    ORDER BY orden ASC, fecha_inicio DESC, id DESC[m
+[32m+[m[32m  `);[m
+[32m+[m
+[32m+[m[32m  return filas;[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mexport async function obtenerTestimoniosPublicos() {[m
+[32m+[m[32m  const [filas] = await pool.query<RowDataPacket[]>(`[m
+[32m+[m[32m    SELECT[m
+[32m+[m[32m      id,[m
+[32m+[m[32m      nombre,[m
+[32m+[m[32m      comentario,[m
+[32m+[m[32m      publicado,[m
+[32m+[m[32m      creado_en,[m
+[32m+[m[32m      actualizado_en[m
+[32m+[m[32m    FROM testimonios[m
+[32m+[m[32m    WHERE publicado = 1[m
+[32m+[m[32m    ORDER BY id DESC[m
+[32m+[m[32m  `);[m
+[32m+[m
+[32m+[m[32m  return filas;[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mexport async function obtenerPublicacionesPublicas() {[m
+[32m+[m[32m  const [filas] = await pool.query<PublicacionPublica[]>(`[m
+[32m+[m[32m    SELECT[m
+[32m+[m[32m      id,[m
+[32m+[m[32m      titulo,[m
+[32m+[m[32m      resumen,[m
+[32m+[m[32m      contenido,[m
+[32m+[m[32m      imagen_url,[m
+[32m+[m[32m      estado,[m
+[32m+[m[32m      fecha_publicacion,[m
+[32m+[m[32m      creado_en,[m
+[32m+[m[32m      actualizado_en[m
+[32m+[m[32m    FROM publicaciones[m
+[32m+[m[32m    WHERE estado = 'PUBLICADO'[m
+[32m+[m[32m    ORDER BY fecha_publicacion DESC, id DESC[m
+[32m+[m[32m  `);[m
+[32m+[m
+[32m+[m[32m  return filas;[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mexport async function obtenerPublicacionPublica(id: string) {[m
+[32m+[m[32m  const [filas] = await pool.query<PublicacionPublica[]>([m
+[32m+[m[32m    `[m
+[32m+[m[32m    SELECT[m
+[32m+[m[32m      id,[m
+[32m+[m[32m      titulo,[m
+[32m+[m[32m      resumen,[m
+[32m+[m[32m      contenido,[m
+[32m+[m[32m      imagen_url,[m
+[32m+[m[32m      estado,[m
+[32m+[m[32m      fecha_publicacion,[m
+[32m+[m[32m      creado_en,[m
+[32m+[m[32m      actualizado_en[m
+[32m+[m[32m    FROM publicaciones[m
+[32m+[m[32m    WHERE id = ?[m
+[32m+[m[32m      AND estado = 'PUBLICADO'[m
+[32m+[m[32m    LIMIT 1[m
+[32m+[m[32m    `,[m
+[32m+[m[32m    [id][m
+[32m+[m[32m  );[m
+[32m+[m
+[32m+[m[32m  return filas[0] || null;[m
+[32m+[m[32m}[m
+[1mdiff --git a/app/lib/db.ts b/app/lib/db.ts[m
+[1mindex f377b68..795fc25 100644[m
+[1m--- a/app/lib/db.ts[m
+[1m+++ b/app/lib/db.ts[m
+[36m@@ -1,12 +1,88 @@[m
+ import mysql from "mysql2/promise";[m
+[32m+[m[32mimport { readFileSync } from "fs";[m
+ [m
+[31m-const pool = mysql.createPool({[m
+[31m-host: "127.0.0.1",  user: "root",[m
+[31m-  password: "",[m
+[31m-  database: "psicologia",[m
+[31m-  waitForConnections: true,[m
+[31m-  connectionLimit: 10,[m
+[31m-  queueLimit: 0,[m
+[32m+[m[32mfunction sslDelEntorno(): mysql.SslOptions | undefined {[m
+[32m+[m[32m  const ssl = process.env.DB_SSL;[m
+[32m+[m[32m  if (ssl !== "true" && ssl !== "1") {[m
+[32m+[m[32m    return undefined;[m
+[32m+[m[32m  }[m
+[32m+[m
+[32m+[m[32m  const opciones: mysql.SslOptions = {[m
+[32m+[m[32m    rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED !== "false",[m
+[32m+[m[32m  };[m
+[32m+[m
+[32m+[m[32m  // CA del proveedor MySQL gestionado (RDS, PlanetScale, etc.).[m
+[32m+[m[32m  if (process.env.DB_SSL_CA) {[m
+[32m+[m[32m    opciones.ca = readFileSync(process.env.DB_SSL_CA);[m
+[32m+[m[32m  }[m
+[32m+[m
+[32m+[m[32m  return opciones;[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mfunction opcionesPool(): mysql.PoolOptions {[m
+[32m+[m[32m  const produccion = process.env.NODE_ENV === "production";[m
+[32m+[m[32m  const enBuild = process.env.NEXT_PHASE === "phase-production-build";[m
+[32m+[m[32m  const host = process.env.DB_HOST || "127.0.0.1";[m
+[32m+[m[32m  const user = process.env.DB_USER || "root";[m
+[32m+[m[32m  const password = process.env.DB_PASSWORD ?? "";[m
+[32m+[m[32m  const database = process.env.DB_NAME || "psicologia";[m
+[32m+[m[32m  const port = Number(process.env.DB_PORT || 3306);[m
+[32m+[m
+[32m+[m[32m  if (produccion && !enBuild) {[m
+[32m+[m[32m    const faltantes: string[] = [];[m
+[32m+[m
+[32m+[m[32m    if (!process.env.DB_HOST) faltantes.push("DB_HOST");[m
+[32m+[m[32m    if (!process.env.DB_USER) faltantes.push("DB_USER");[m
+[32m+[m[32m    if (process.env.DB_PASSWORD === undefined) faltantes.push("DB_PASSWORD");[m
+[32m+[m[32m    if (!process.env.DB_NAME) faltantes.push("DB_NAME");[m
+[32m+[m
+[32m+[m[32m    if (faltantes.length > 0) {[m
+[32m+[m[32m      throw new Error([m
+[32m+[m[32m        `Faltan variables de base de datos en producción: ${faltantes.join(", ")}.`[m
+[32m+[m[32m      );[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    if (user === "root") {[m
+[32m+[m[32m      throw new Error([m
+[32m+[m[32m        "DB_USER=root no es adecuado en producción. Crea un usuario de aplicación con privilegios mínimos."[m
+[32m+[m[32m      );[m
+[32m+[m[32m    }[m
+[32m+[m[32m  }[m
+[32m+[m
+[32m+[m[32m  return {[m
+[32m+[m[32m    host,[m
+[32m+[m[32m    port,[m
+[32m+[m[32m    user,[m
+[32m+[m[32m    password,[m
+[32m+[m[32m    database,[m
+[32m+[m[32m    waitForConnections: true,[m
+[32m+[m[32m    connectionLimit: Number(process.env.DB_CONNECTION_LIMIT || 10),[m
+[32m+[m[32m    queueLimit: 0,[m
+[32m+[m[32m    enableKeepAlive: true,[m
+[32m+[m[32m    ssl: sslDelEntorno(),[m
+[32m+[m[32m    timezone: "Z",[m
+[32m+[m[32m  };[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mlet pool: mysql.Pool | null = null;[m
+[32m+[m
+[32m+[m[32mfunction obtenerPool(): mysql.Pool {[m
+[32m+[m[32m  if (!pool) {[m
+[32m+[m[32m    pool = mysql.createPool(opcionesPool());[m
+[32m+[m[32m  }[m
+[32m+[m
+[32m+[m[32m  return pool;[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mconst poolProxy = new Proxy({} as mysql.Pool, {[m
+[32m+[m[32m  get(_objetivo, propiedad) {[m
+[32m+[m[32m    const instancia = obtenerPool() as unknown as Record<[m
+[32m+[m[32m      PropertyKey,[m
+[32m+[m[32m      unknown[m
+[32m+[m[32m    >;[m
+[32m+[m[32m    const valor = instancia[propiedad];[m
+[32m+[m[32m    return typeof valor === "function" ? valor.bind(instancia) : valor;[m
+[32m+[m[32m  },[m
+ });[m
+ [m
+[31m-export default pool;[m
+\ No newline at end of file[m
+[32m+[m[32mexport default poolProxy;[m
+[1mdiff --git a/app/lib/disponibilidad.ts b/app/lib/disponibilidad.ts[m
+[1mindex 59442d9..e0d6372 100644[m
+[1m--- a/app/lib/disponibilidad.ts[m
+[1m+++ b/app/lib/disponibilidad.ts[m
+[36m@@ -24,6 +24,26 @@[m [mtype ContextoDisponibilidad = {[m
+   servicioId: number;[m
+   duracionMinutos: number | null;[m
+ };[m
+[32m+[m
+[32m+[m[32m// Forma de las respuestas JSON de las rutas[m
+[32m+[m[32m// que consulta obtenerHorasDisponibles.[m
+[32m+[m[32mtype DisponibilidadSemanal = {[m
+[32m+[m[32m  dia_semana: number;[m
+[32m+[m[32m  hora_inicio: string;[m
+[32m+[m[32m  hora_fin: string;[m
+[32m+[m[32m};[m
+[32m+[m
+[32m+[m[32mtype DisponibilidadEspecial = {[m
+[32m+[m[32m  fecha: string;[m
+[32m+[m[32m  hora_inicio?: string;[m
+[32m+[m[32m  hora_fin?: string;[m
+[32m+[m[32m};[m
+[32m+[m
+[32m+[m[32mtype CitaAgenda = {[m
+[32m+[m[32m  id: number;[m
+[32m+[m[32m  hora: string;[m
+[32m+[m[32m  duracion_minutos?: number | null;[m
+[32m+[m[32m};[m
+  [m
+ function generarHoras(horaInicio: string, horaFin: string): string[] {[m
+   const horas: string[] = [];[m
+[36m@@ -38,7 +58,7 @@[m [mfunction generarHoras(horaInicio: string, horaFin: string): string[] {[m
+   return horas;[m
+ }[m
+  [m
+[31m-async function leerJson(url: string): Promise<any> {[m
+[32m+[m[32masync function leerJson(url: string): Promise<unknown> {[m
+   const respuesta = await fetch(url, { cache: "no-store" });[m
+  [m
+   if (!respuesta.ok) {[m
+[36m@@ -65,9 +85,12 @@[m [mexport async function obtenerHorasDisponibles([m
+     leerJson(`${appUrl}/api/bloqueos-agenda?fecha=${encodeURIComponent(fecha)}`),[m
+   ]);[m
+  [m
+[31m-  const listaSemanal: any[] = Array.isArray(semanal) ? semanal : [];[m
+[31m-  const listaEspeciales: any[] = Array.isArray(especiales) ? especiales : [];[m
+[31m-  const listaCitas: any[] = Array.isArray(citas) ? citas : [];[m
+[32m+[m[32m  const listaSemanal: DisponibilidadSemanal[] =[m
+[32m+[m[32m    Array.isArray(semanal) ? semanal : [];[m
+[32m+[m[32m  const listaEspeciales: DisponibilidadEspecial[] =[m
+[32m+[m[32m    Array.isArray(especiales) ? especiales : [];[m
+[32m+[m[32m  const listaCitas: CitaAgenda[] =[m
+[32m+[m[32m    Array.isArray(citas) ? citas : [];[m
+   const listaBloqueos: { inicio: string; fin: string }[] =[m
+     Array.isArray(bloqueos) ? bloqueos : [];[m
+  [m
+[1mdiff --git a/app/lib/email.ts b/app/lib/email.ts[m
+[1mindex fcfa152..391eb6a 100644[m
+[1m--- a/app/lib/email.ts[m
+[1m+++ b/app/lib/email.ts[m
+[36m@@ -4,9 +4,24 @@[m [mconst resend = new Resend([m
+   process.env.RESEND_API_KEY[m
+ );[m
+ [m
+[31m-const REMITENTE =[m
+[31m-  process.env.RESEND_FROM_EMAIL ||[m
+[31m-  "onboarding@resend.dev";[m
+[32m+[m[32m// Se resuelve por solicitud: un throw a nivel de módulo[m
+[32m+[m[32m// se evaluaría durante `next build` y rompería el build.[m
+[32m+[m[32mfunction obtenerRemitente(): string {[m
+[32m+[m[32m  const remitente = process.env.RESEND_FROM_EMAIL;[m
+[32m+[m
+[32m+[m[32m  if (!remitente) {[m
+[32m+[m[32m    if (process.env.NODE_ENV === "production") {[m
+[32m+[m[32m      throw new Error([m
+[32m+[m[32m        "RESEND_FROM_EMAIL no está configurada. Verifica tu dominio en Resend antes de desplegar."[m
+[32m+[m[32m      );[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    // Solo en desarrollo se permite el remitente de prueba de Resend.[m
+[32m+[m[32m    return "onboarding@resend.dev";[m
+[32m+[m[32m  }[m
+[32m+[m
+[32m+[m[32m  return remitente;[m
+[32m+[m[32m}[m
+ [m
+ export async function enviarCorreo({[m
+   para,[m
+[36m@@ -25,7 +40,7 @@[m [mexport async function enviarCorreo({[m
+ [m
+   const { data, error } =[m
+     await resend.emails.send({[m
+[31m-      from: REMITENTE,[m
+[32m+[m[32m      from: obtenerRemitente(),[m
+       to: [para],[m
+       subject: asunto,[m
+       html,[m
+[1mdiff --git a/app/lib/google-calendar.ts b/app/lib/google-calendar.ts[m
+[1mindex 7e7db0d..99a312d 100644[m
+[1m--- a/app/lib/google-calendar.ts[m
+[1m+++ b/app/lib/google-calendar.ts[m
+[36m@@ -1,6 +1,8 @@[m
+ import { google } from "googleapis";[m
+[32m+[m[32mimport type { RowDataPacket } from "mysql2";[m
+ import pool from "./db";[m
+ import crypto from "crypto";[m
+[32m+[m[32mimport { descifrarToken } from "./seguridad-tokens";[m
+ [m
+ type CrearEventoGoogleParams = {[m
+   fecha: string | Date;[m
+[36m@@ -17,13 +19,27 @@[m [mtype ResultadoEventoGoogle = {[m
+   meetLink: string | null;[m
+ };[m
+ [m
+[32m+[m[32m// Solo la parte de conferenceData que[m
+[32m+[m[32m// usa extraerMeetLink. Todo es opcional[m
+[32m+[m[32m// porque Google puede devolver cualquier[m
+[32m+[m[32m// subconjunto de campos.[m
+[32m+[m[32mtype PuntoDeEntrada = {[m
+[32m+[m[32m  entryPointType?: string | null;[m
+[32m+[m[32m  uri?: string | null;[m
+[32m+[m[32m};[m
+[32m+[m
+[32m+[m[32mtype ConferenceData = {[m
+[32m+[m[32m  entryPoints?: PuntoDeEntrada[];[m
+[32m+[m[32m  createRequest?: { status?: { statusCode?: string | null } };[m
+[32m+[m[32m};[m
+[32m+[m
+ /**[m
+  * Prepara el cliente autenticado de Google Calendar,[m
+  * junto con la configuración guardada (calendar_id).[m
+  * La usan tanto crear como actualizar eventos.[m
+  */[m
+ async function obtenerClienteCalendar() {[m
+[31m-  const [configuraciones]: any = await pool.query([m
+[32m+[m[32m  const [configuraciones] = await pool.query<RowDataPacket[]>([m
+     `SELECT refresh_token, calendar_id[m
+      FROM google_calendar_config[m
+      WHERE activo = 1[m
+[36m@@ -56,7 +72,9 @@[m [masync function obtenerClienteCalendar() {[m
+   );[m
+ [m
+   oauth2Client.setCredentials({[m
+[31m-    refresh_token: configuracion.refresh_token,[m
+[32m+[m[32m    refresh_token: descifrarToken([m
+[32m+[m[32m      configuracion.refresh_token[m
+[32m+[m[32m    ),[m
+   });[m
+ [m
+   const calendar = google.calendar({[m
+[36m@@ -575,14 +593,14 @@[m [mfunction formatearFechaBogota([m
+  * desde conferenceData.[m
+  */[m
+ function extraerMeetLink([m
+[31m-  conferenceData: any[m
+[32m+[m[32m  conferenceData: ConferenceData | null | undefined[m
+ ): string | null {[m
+   const entries =[m
+     conferenceData?.entryPoints || [];[m
+ [m
+   const videoEntry =[m
+     entries.find([m
+[31m-      (entry: any) =>[m
+[32m+[m[32m      (entry) =>[m
+         entry.entryPointType ===[m
+           "video" &&[m
+         typeof entry.uri ===[m
+[1mdiff --git a/app/lib/invitacion-testimonio.ts b/app/lib/invitacion-testimonio.ts[m
+[1mindex b32f1a2..632b2de 100644[m
+[1m--- a/app/lib/invitacion-testimonio.ts[m
+[1m+++ b/app/lib/invitacion-testimonio.ts[m
+[36m@@ -1,4 +1,5 @@[m
+ import { randomBytes, createHash } from "crypto";[m
+[32m+[m[32mimport type { RowDataPacket } from "mysql2";[m
+ import pool from "./db";[m
+ import { enviarCorreo } from "./email";[m
+ [m
+[36m@@ -66,7 +67,7 @@[m [mexport async function enviarInvitacionTestimonio([m
+     };[m
+   }[m
+ [m
+[31m-  const [filas]: any = await pool.query([m
+[32m+[m[32m  const [filas] = await pool.query<RowDataPacket[]>([m
+     `[m
+       SELECT[m
+         c.id AS cita_id,[m
+[36m@@ -124,8 +125,11 @@[m [mexport async function enviarInvitacionTestimonio([m
+       `,[m
+       [cita.cita_id, tokenHash][m
+     );[m
+[31m-  } catch (error: any) {[m
+[31m-    if (error?.code === "ER_DUP_ENTRY") {[m
+[32m+[m[32m  } catch (error: unknown) {[m
+[32m+[m[32m    if ([m
+[32m+[m[32m      (error as { code?: string })?.code ===[m
+[32m+[m[32m      "ER_DUP_ENTRY"[m
+[32m+[m[32m    ) {[m
+       return { enviada: false, motivo: "ya_existe" };[m
+     }[m
+     throw error;[m
+[36m@@ -189,7 +193,7 @@[m [mexport async function enviarInvitacionTestimonio([m
+       asunto: "Nos gustaría conocer tu experiencia",[m
+       html,[m
+     });[m
+[31m-  } catch (error: any) {[m
+[32m+[m[32m  } catch (error: unknown) {[m
+     await pool.query([m
+       `[m
+         UPDATE solicitudes_testimonio[m
+[36m@@ -197,7 +201,10 @@[m [mexport async function enviarInvitacionTestimonio([m
+         WHERE cita_id = ? AND estado = 'PENDIENTE'[m
+       `,[m
+       [[m
+[31m-        String(error?.message || "Error al enviar el correo.").slice(0, 1000),[m
+[32m+[m[32m        String([m
+[32m+[m[32m          (error as { message?: string })?.message ||[m
+[32m+[m[32m            "Error al enviar el correo."[m
+[32m+[m[32m        ).slice(0, 1000),[m
+         cita.cita_id,[m
+       ][m
+     );[m
+[1mdiff --git a/app/lib/rate-limit.ts b/app/lib/rate-limit.ts[m
+[1mnew file mode 100644[m
+[1mindex 0000000..0c20f56[m
+[1m--- /dev/null[m
+[1m+++ b/app/lib/rate-limit.ts[m
+[36m@@ -0,0 +1,59 @@[m
+[32m+[m[32mtype Cubeta = {[m
+[32m+[m[32m  intentos: number;[m
+[32m+[m[32m  reinicio: number;[m
+[32m+[m[32m};[m
+[32m+[m
+[32m+[m[32mconst cubetas = new Map<string, Cubeta>();[m
+[32m+[m
+[32m+[m[32mconst LIMPIEZA_MS = 60_000;[m
+[32m+[m[32mlet ultimaLimpieza = Date.now();[m
+[32m+[m
+[32m+[m[32mfunction limpiarExpiradas(ahora: number) {[m
+[32m+[m[32m  if (ahora - ultimaLimpieza < LIMPIEZA_MS) {[m
+[32m+[m[32m    return;[m
+[32m+[m[32m  }[m
+[32m+[m
+[32m+[m[32m  ultimaLimpieza = ahora;[m
+[32m+[m
+[32m+[m[32m  for (const [clave, cubeta] of cubetas) {[m
+[32m+[m[32m    if (cubeta.reinicio <= ahora) {[m
+[32m+[m[32m      cubetas.delete(clave);[m
+[32m+[m[32m    }[m
+[32m+[m[32m  }[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mexport function ipDelCliente(request: Request): string {[m
+[32m+[m[32m  const forwarded = request.headers.get("x-forwarded-for");[m
+[32m+[m
+[32m+[m[32m  if (forwarded) {[m
+[32m+[m[32m    return forwarded.split(",")[0]?.trim() || "unknown";[m
+[32m+[m[32m  }[m
+[32m+[m
+[32m+[m[32m  return request.headers.get("x-real-ip")?.trim() || "unknown";[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mexport function permitirIntento([m
+[32m+[m[32m  clave: string,[m
+[32m+[m[32m  maximo: number,[m
+[32m+[m[32m  ventanaMs: number[m
+[32m+[m[32m): boolean {[m
+[32m+[m[32m  const ahora = Date.now();[m
+[32m+[m[32m  limpiarExpiradas(ahora);[m
+[32m+[m
+[32m+[m[32m  const existente = cubetas.get(clave);[m
+[32m+[m
+[32m+[m[32m  if (!existente || existente.reinicio <= ahora) {[m
+[32m+[m[32m    cubetas.set(clave, {[m
+[32m+[m[32m      intentos: 1,[m
+[32m+[m[32m      reinicio: ahora + ventanaMs,[m
+[32m+[m[32m    });[m
+[32m+[m[32m    return true;[m
+[32m+[m[32m  }[m
+[32m+[m
+[32m+[m[32m  if (existente.intentos >= maximo) {[m
+[32m+[m[32m    return false;[m
+[32m+[m[32m  }[m
+[32m+[m
+[32m+[m[32m  existente.intentos += 1;[m
+[32m+[m[32m  return true;[m
+[32m+[m[32m}[m
+[1mdiff --git a/app/lib/recordatorio.ts b/app/lib/recordatorio.ts[m
+[1mindex 17568e7..97d602e 100644[m
+[1m--- a/app/lib/recordatorio.ts[m
+[1m+++ b/app/lib/recordatorio.ts[m
+[36m@@ -1,4 +1,5 @@[m
+ import crypto from "crypto";[m
+[32m+[m[32mimport type { RowDataPacket } from "mysql2";[m
+ import pool from "@/app/lib/db";[m
+ [m
+ // ======================================================[m
+[36m@@ -112,7 +113,7 @@[m [mexport async function obtenerCitaValidada([m
+     return { ok: false, error: "El enlace no es válido.", status: 400 };[m
+   }[m
+ [m
+[31m-  const [filas]: any = await pool.query([m
+[32m+[m[32m  const [filas] = await pool.query<RowDataPacket[]>([m
+     `[m
+       SELECT[m
+         c.id,[m
+[36m@@ -171,7 +172,10 @@[m [mexport async function obtenerCitaValidada([m
+     };[m
+   }[m
+ [m
+[31m-  const { token_confirmacion: _omitido, ...cita } = fila;[m
+[32m+[m[32m  // Se quita token_confirmacion del objeto[m
+[32m+[m[32m  // que se devuelve (no debe salir de aquí).[m
+[32m+[m[32m  const cita = { ...fila };[m
+[32m+[m[32m  delete cita.token_confirmacion;[m
+   return { ok: true, cita: cita as CitaRecordatorio };[m
+ }[m
+ [m
+[1mdiff --git a/app/lib/secreto.ts b/app/lib/secreto.ts[m
+[1mnew file mode 100644[m
+[1mindex 0000000..2fe7cdb[m
+[1m--- /dev/null[m
+[1m+++ b/app/lib/secreto.ts[m
+[36m@@ -0,0 +1,61 @@[m
+[32m+[m[32mimport crypto from "crypto";[m
+[32m+[m
+[32m+[m[32mconst PREFIJO = "enc:v1:";[m
+[32m+[m
+[32m+[m[32mfunction claveDerivada(): Buffer | null {[m
+[32m+[m[32m  const secreto =[m
+[32m+[m[32m    process.env.TOKEN_ENCRYPTION_KEY || process.env.AUTH_SECRET;[m
+[32m+[m
+[32m+[m[32m  if (!secreto) {[m
+[32m+[m[32m    return null;[m
+[32m+[m[32m  }[m
+[32m+[m
+[32m+[m[32m  return crypto.createHash("sha256").update(secreto).digest();[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mexport function cifrarSecreto(valor: string): string {[m
+[32m+[m[32m  const clave = claveDerivada();[m
+[32m+[m
+[32m+[m[32m  if (!clave) {[m
+[32m+[m[32m    return valor;[m
+[32m+[m[32m  }[m
+[32m+[m
+[32m+[m[32m  const iv = crypto.randomBytes(12);[m
+[32m+[m[32m  const cipher = crypto.createCipheriv("aes-256-gcm", clave, iv);[m
+[32m+[m[32m  const cifrado = Buffer.concat([[m
+[32m+[m[32m    cipher.update(valor, "utf8"),[m
+[32m+[m[32m    cipher.final(),[m
+[32m+[m[32m  ]);[m
+[32m+[m[32m  const tag = cipher.getAuthTag();[m
+[32m+[m
+[32m+[m[32m  return ([m
+[32m+[m[32m    PREFIJO +[m
+[32m+[m[32m    Buffer.concat([iv, tag, cifrado]).toString("base64url")[m
+[32m+[m[32m  );[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mexport function descifrarSecreto(valor: string): string {[m
+[32m+[m[32m  if (!valor.startsWith(PREFIJO)) {[m
+[32m+[m[32m    return valor;[m
+[32m+[m[32m  }[m
+[32m+[m
+[32m+[m[32m  const clave = claveDerivada();[m
+[32m+[m
+[32m+[m[32m  if (!clave) {[m
+[32m+[m[32m    throw new Error([m
+[32m+[m[32m      "No hay AUTH_SECRET ni TOKEN_ENCRYPTION_KEY para leer el token cifrado."[m
+[32m+[m[32m    );[m
+[32m+[m[32m  }[m
+[32m+[m
+[32m+[m[32m  const raw = Buffer.from(valor.slice(PREFIJO.length), "base64url");[m
+[32m+[m[32m  const iv = raw.subarray(0, 12);[m
+[32m+[m[32m  const tag = raw.subarray(12, 28);[m
+[32m+[m[32m  const cifrado = raw.subarray(28);[m
+[32m+[m[32m  const decipher = crypto.createDecipheriv("aes-256-gcm", clave, iv);[m
+[32m+[m[32m  decipher.setAuthTag(tag);[m
+[32m+[m
+[32m+[m[32m  return Buffer.concat([[m
+[32m+[m[32m    decipher.update(cifrado),[m
+[32m+[m[32m    decipher.final(),[m
+[32m+[m[32m  ]).toString("utf8");[m
+[32m+[m[32m}[m
+[1mdiff --git a/app/lib/seguridad-tokens.ts b/app/lib/seguridad-tokens.ts[m
+[1mnew file mode 100644[m
+[1mindex 0000000..9b4201e[m
+[1m--- /dev/null[m
+[1m+++ b/app/lib/seguridad-tokens.ts[m
+[36m@@ -0,0 +1,78 @@[m
+[32m+[m[32mimport crypto from "crypto";[m
+[32m+[m
+[32m+[m[32m// Cifrado AES-256-GCM para datos sensibles en reposo[m
+[32m+[m[32m// (refresh_token de Google). La clave se deriva de[m
+[32m+[m[32m// TOKEN_ENCRYPTION_KEY; si no existe, de AUTH_SECRET.[m
+[32m+[m[32mconst PREFIJO = "enc:v1:";[m
+[32m+[m
+[32m+[m[32mfunction claveDeCifrado(): Buffer {[m
+[32m+[m[32m  const secreto =[m
+[32m+[m[32m    process.env.TOKEN_ENCRYPTION_KEY ||[m
+[32m+[m[32m    process.env.AUTH_SECRET;[m
+[32m+[m
+[32m+[m[32m  if (!secreto) {[m
+[32m+[m[32m    throw new Error([m
+[32m+[m[32m      "Falta TOKEN_ENCRYPTION_KEY o AUTH_SECRET para cifrar tokens."[m
+[32m+[m[32m    );[m
+[32m+[m[32m  }[m
+[32m+[m
+[32m+[m[32m  // SHA-256 del secreto → clave de 32 bytes para AES-256.[m
+[32m+[m[32m  return crypto[m
+[32m+[m[32m    .createHash("sha256")[m
+[32m+[m[32m    .update(secreto)[m
+[32m+[m[32m    .digest();[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mexport function cifrarToken(valor: string): string {[m
+[32m+[m[32m  const clave = claveDeCifrado();[m
+[32m+[m[32m  const iv = crypto.randomBytes(12);[m
+[32m+[m
+[32m+[m[32m  const cifrador = crypto.createCipheriv([m
+[32m+[m[32m    "aes-256-gcm",[m
+[32m+[m[32m    clave,[m
+[32m+[m[32m    iv[m
+[32m+[m[32m  );[m
+[32m+[m
+[32m+[m[32m  const cifrado = Buffer.concat([[m
+[32m+[m[32m    cifrador.update(valor, "utf8"),[m
+[32m+[m[32m    cifrador.final(),[m
+[32m+[m[32m  ]);[m
+[32m+[m
+[32m+[m[32m  const etiqueta = cifrador.getAuthTag();[m
+[32m+[m
+[32m+[m[32m  return `${PREFIJO}${iv.toString("hex")}:${etiqueta.toString("hex")}:${cifrado.toString("hex")}`;[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mexport function descifrarToken(valor: string): string {[m
+[32m+[m[32m  // Compatibilidad con tokens guardados antes del cifrado.[m
+[32m+[m[32m  if (!valor.startsWith(PREFIJO)) {[m
+[32m+[m[32m    return valor;[m
+[32m+[m[32m  }[m
+[32m+[m
+[32m+[m[32m  const clave = claveDeCifrado();[m
+[32m+[m[32m  const [, ivHex, etiquetaHex, cifradoHex] =[m
+[32m+[m[32m    valor.split(":");[m
+[32m+[m
+[32m+[m[32m  if (!ivHex || !etiquetaHex || !cifradoHex) {[m
+[32m+[m[32m    throw new Error([m
+[32m+[m[32m      "Token cifrado con formato inválido."[m
+[32m+[m[32m    );[m
+[32m+[m[32m  }[m
+[32m+[m
+[32m+[m[32m  const iv = Buffer.from(ivHex, "hex");[m
+[32m+[m[32m  const etiqueta = Buffer.from(etiquetaHex, "hex");[m
+[32m+[m[32m  const cifrado = Buffer.from(cifradoHex, "hex");[m
+[32m+[m
+[32m+[m[32m  const descifrador = crypto.createDecipheriv([m
+[32m+[m[32m    "aes-256-gcm",[m
+[32m+[m[32m    clave,[m
+[32m+[m[32m    iv[m
+[32m+[m[32m  );[m
+[32m+[m
+[32m+[m[32m  descifrador.setAuthTag(etiqueta);[m
+[32m+[m
+[32m+[m[32m  return Buffer.concat([[m
+[32m+[m[32m    descifrador.update(cifrado),[m
+[32m+[m[32m    descifrador.final(),[m
+[32m+[m[32m  ]).toString("utf8");[m
+[32m+[m[32m}[m
+[1mdiff --git a/app/lib/testimonio.ts b/app/lib/testimonio.ts[m
+[1mindex 2025fbd..197c7a4 100644[m
+[1m--- a/app/lib/testimonio.ts[m
+[1m+++ b/app/lib/testimonio.ts[m
+[36m@@ -1,4 +1,5 @@[m
+ import { createHash } from "crypto";[m
+[32m+[m[32mimport type { RowDataPacket } from "mysql2";[m
+ import pool from "./db";[m
+ [m
+ // Debe coincidir EXACTAMENTE con la función generarHash()[m
+[36m@@ -38,7 +39,7 @@[m [mexport async function obtenerSolicitudValidada([m
+ [m
+   const tokenHash = generarHashToken(token);[m
+ [m
+[31m-  const [filas]: any = await pool.query([m
+[32m+[m[32m  const [filas] = await pool.query<RowDataPacket[]>([m
+     `[m
+       SELECT[m
+         st.id,[m
+[1mdiff --git a/app/lib/uploads.ts b/app/lib/uploads.ts[m
+[1mnew file mode 100644[m
+[1mindex 0000000..88839bf[m
+[1m--- /dev/null[m
+[1m+++ b/app/lib/uploads.ts[m
+[36m@@ -0,0 +1,45 @@[m
+[32m+[m[32mimport { mkdir, writeFile } from "fs/promises";[m
+[32m+[m[32mimport path from "path";[m
+[32m+[m[32mimport crypto from "crypto";[m
+[32m+[m
+[32m+[m[32mconst TIPOS_PERMITIDOS: Record<string, string> = {[m
+[32m+[m[32m  "image/jpeg": "jpg",[m
+[32m+[m[32m  "image/png": "png",[m
+[32m+[m[32m  "image/webp": "webp",[m
+[32m+[m[32m};[m
+[32m+[m
+[32m+[m[32mexport function extensionDeImagen(tipo: string): string | null {[m
+[32m+[m[32m  return TIPOS_PERMITIDOS[tipo] || null;[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mexport function directorioUploads(): string {[m
+[32m+[m[32m  if (process.env.UPLOAD_DIR) {[m
+[32m+[m[32m    return path.resolve(process.env.UPLOAD_DIR);[m
+[32m+[m[32m  }[m
+[32m+[m
+[32m+[m[32m  return path.join(process.cwd(), "public", "uploads");[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mexport async function guardarImagenSubida([m
+[32m+[m[32m  carpeta: "logo" | "perfil" | "blog" | "trayectoria",[m
+[32m+[m[32m  archivo: File[m
+[32m+[m[32m): Promise<{ url: string }> {[m
+[32m+[m[32m  const extension = extensionDeImagen(archivo.type);[m
+[32m+[m
+[32m+[m[32m  if (!extension) {[m
+[32m+[m[32m    throw new Error("FORMATO_INVALIDO");[m
+[32m+[m[32m  }[m
+[32m+[m
+[32m+[m[32m  const nombreArchivo = `${crypto.randomUUID()}.${extension}`;[m
+[32m+[m[32m  const destino = path.join(directorioUploads(), carpeta);[m
+[32m+[m
+[32m+[m[32m  await mkdir(destino, { recursive: true });[m
+[32m+[m[32m  await writeFile([m
+[32m+[m[32m    path.join(destino, nombreArchivo),[m
+[32m+[m[32m    Buffer.from(await archivo.arrayBuffer())[m
+[32m+[m[32m  );[m
+[32m+[m
+[32m+[m[32m  return {[m
+[32m+[m[32m    url: `/uploads/${carpeta}/${nombreArchivo}`,[m
+[32m+[m[32m  };[m
+[32m+[m[32m}[m
+[1mdiff --git a/app/login/page.tsx b/app/login/page.tsx[m
+[1mindex 9b183fb..37af986 100644[m
+[1m--- a/app/login/page.tsx[m
+[1m+++ b/app/login/page.tsx[m
+[36m@@ -1,6 +1,7 @@[m
+ "use client";[m
+ [m
+ import { FormEvent, useState } from "react";[m
+[32m+[m[32mimport Link from "next/link";[m
+ [m
+ export default function LoginPage() {[m
+     const [email, setEmail] = useState("");[m
+[36m@@ -186,12 +187,12 @@[m [mexport default function LoginPage() {[m
+ [m
+                     {/* VOLVER AL SITIO */}[m
+                     <div className="mt-6 text-center">[m
+[31m-                        <a[m
+[32m+[m[32m                        <Link[m
+                             href="/"[m
+                             className="text-sm text-[#707469] transition hover:text-[#C56835]"[m
+                         >[m
+                             ← Volver al sitio web[m
+[31m-                        </a>[m
+[32m+[m[32m                        </Link>[m
+                     </div>[m
+ [m
+                     <p className="mt-8 text-center text-xs leading-5 text-[#92948D]">[m
+[1mdiff --git a/app/page.tsx b/app/page.tsx[m
+[1mindex c8b8450..7fa055c 100644[m
+[1m--- a/app/page.tsx[m
+[1m+++ b/app/page.tsx[m
+[36m@@ -1,58 +1,40 @@[m
+ import ScrollToTop from "./ScrollToTop";[m
+ import { formatearDuracion } from "./lib/duracion";[m
+[32m+[m[32mimport {[m
+[32m+[m[32m  obtenerPerfilPublico,[m
+[32m+[m[32m  obtenerPublicacionesPublicas,[m
+[32m+[m[32m  obtenerServiciosPublicos,[m
+[32m+[m[32m  obtenerTestimoniosPublicos,[m
+[32m+[m[32m  obtenerTrayectoriaPublica,[m
+[32m+[m[32m  type PublicacionPublica,[m
+[32m+[m[32m} from "./lib/contenido-publico";[m
+ [m
+[31m-interface PublicacionBlog {[m
+[31m-  id: number;[m
+[31m-  titulo: string;[m
+[31m-  resumen: string | null;[m
+[31m-  contenido: string;[m
+[31m-  imagen_url: string | null;[m
+[31m-}[m
+[32m+[m[32mexport const dynamic = "force-dynamic";[m
+ [m
+ export default async function Home() {[m
+[31m-  const [[m
+[31m-    respuestaServicios,[m
+[31m-    respuestaPerfil,[m
+[31m-    respuestaTrayectoria,[m
+[31m-    respuestaTestimonios,[m
+[31m-    respuestaPublicaciones,[m
+[31m-  ] = await Promise.all([[m
+[31m-    fetch("http://localhost:3000/api/servicios", {[m
+[31m-      cache: "no-store",[m
+[31m-    }),[m
+[31m-    fetch("http://localhost:3000/api/perfil", {[m
+[31m-      cache: "no-store",[m
+[31m-    }),[m
+[31m-    fetch("http://localhost:3000/api/trayectoria", {[m
+[31m-      cache: "no-store",[m
+[31m-    }),[m
+[31m-    fetch("http://localhost:3000/api/testimonios", {[m
+[31m-      cache: "no-store",[m
+[31m-    }),[m
+[31m-    fetch("http://localhost:3000/api/publicaciones", {[m
+[31m-      cache: "no-store",[m
+[31m-    }),[m
+[31m-  ]);[m
+[31m-[m
+[31m-  const servicios = respuestaServicios.ok[m
+[31m-    ? await respuestaServicios.json()[m
+[31m-    : [];[m
+[31m-[m
+[31m-  const perfil = respuestaPerfil.ok[m
+[31m-    ? await respuestaPerfil.json()[m
+[31m-    : null;[m
+[31m-[m
+[31m-  const trayectoria = respuestaTrayectoria.ok[m
+[31m-    ? await respuestaTrayectoria.json()[m
+[31m-    : [];[m
+[31m-[m
+[31m-  const testimonios = respuestaTestimonios.ok[m
+[31m-    ? await respuestaTestimonios.json()[m
+[31m-    : [];[m
+[31m-[m
+[31m-  const publicaciones: PublicacionBlog[] = respuestaPublicaciones.ok[m
+[31m-    ? await respuestaPublicaciones.json()[m
+[31m-    : [];[m
+[32m+[m[32m  let servicios: any[] = [];[m
+[32m+[m[32m  let perfil: any = null;[m
+[32m+[m[32m  let trayectoria: any[] = [];[m
+[32m+[m[32m  let testimonios: any[] = [];[m
+[32m+[m[32m  let publicaciones: PublicacionPublica[] = [];[m
+[32m+[m
+[32m+[m[32m  try {[m
+[32m+[m[32m    const resultado = await Promise.all([[m
+[32m+[m[32m      obtenerServiciosPublicos(),[m
+[32m+[m[32m      obtenerPerfilPublico(),[m
+[32m+[m[32m      obtenerTrayectoriaPublica(),[m
+[32m+[m[32m      obtenerTestimoniosPublicos(),[m
+[32m+[m[32m      obtenerPublicacionesPublicas(),[m
+[32m+[m[32m    ]);[m
+[32m+[m
+[32m+[m[32m    servicios = resultado[0];[m
+[32m+[m[32m    perfil = resultado[1];[m
+[32m+[m[32m    trayectoria = resultado[2];[m
+[32m+[m[32m    testimonios = resultado[3];[m
+[32m+[m[32m    publicaciones = resultado[4];[m
+[32m+[m[32m  } catch (error) {[m
+[32m+[m[32m    console.error("Error cargando la página de inicio:", error);[m
+[32m+[m[32m  }[m
+ [m
+   const nombreProfesional =[m
+     perfil?.nombre_profesional || "Aura Elisa Sánchez";[m
+[1mdiff --git a/app/uploads/[...ruta]/route.ts b/app/uploads/[...ruta]/route.ts[m
+[1mnew file mode 100644[m
+[1mindex 0000000..575385e[m
+[1m--- /dev/null[m
+[1m+++ b/app/uploads/[...ruta]/route.ts[m
+[36m@@ -0,0 +1,60 @@[m
+[32m+[m[32mimport { readFile } from "node:fs/promises";[m
+[32m+[m[32mimport path from "node:path";[m
+[32m+[m[32mimport { NextResponse } from "next/server";[m
+[32m+[m[32mimport { directorioUploads } from "../../lib/uploads";[m
+[32m+[m
+[32m+[m[32mexport const runtime = "nodejs";[m
+[32m+[m[32mexport const dynamic = "force-dynamic";[m
+[32m+[m
+[32m+[m[32mconst CARPETAS_PERMITIDAS = new Set([[m
+[32m+[m[32m  "logo",[m
+[32m+[m[32m  "perfil",[m
+[32m+[m[32m  "blog",[m
+[32m+[m[32m  "trayectoria",[m
+[32m+[m[32m]);[m
+[32m+[m
+[32m+[m[32mconst TIPOS_POR_EXTENSION: Record<string, string> = {[m
+[32m+[m[32m  jpg: "image/jpeg",[m
+[32m+[m[32m  png: "image/png",[m
+[32m+[m[32m  webp: "image/webp",[m
+[32m+[m[32m};[m
+[32m+[m
+[32m+[m[32mexport async function GET([m
+[32m+[m[32m  _request: Request,[m
+[32m+[m[32m  { params }: { params: Promise<{ ruta: string[] }> }[m
+[32m+[m[32m) {[m
+[32m+[m[32m  const { ruta } = await params;[m
+[32m+[m
+[32m+[m[32m  if ([m
+[32m+[m[32m    ruta.length !== 2 ||[m
+[32m+[m[32m    !CARPETAS_PERMITIDAS.has(ruta[0]) ||[m
+[32m+[m[32m    !/^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}\.(jpg|png|webp)$/i.test([m
+[32m+[m[32m      ruta[1][m
+[32m+[m[32m    )[m
+[32m+[m[32m  ) {[m
+[32m+[m[32m    return new NextResponse(null, { status: 404 });[m
+[32m+[m[32m  }[m
+[32m+[m
+[32m+[m[32m  const directorio = path.resolve(directorioUploads());[m
+[32m+[m[32m  const archivo = path.resolve(directorio, ...ruta);[m
+[32m+[m[32m  const relativo = path.relative(directorio, archivo);[m
+[32m+[m
+[32m+[m[32m  if (relativo.startsWith("..") || path.isAbsolute(relativo)) {[m
+[32m+[m[32m    return new NextResponse(null, { status: 404 });[m
+[32m+[m[32m  }[m
+[32m+[m
+[32m+[m[32m  try {[m
+[32m+[m[32m    const contenido = await readFile(archivo);[m
+[32m+[m[32m    const extension = path.extname(archivo).slice(1).toLowerCase();[m
+[32m+[m
+[32m+[m[32m    return new NextResponse(new Uint8Array(contenido), {[m
+[32m+[m[32m      headers: {[m
+[32m+[m[32m        "Cache-Control": "public, max-age=31536000, immutable",[m
+[32m+[m[32m        "Content-Type": TIPOS_POR_EXTENSION[extension],[m
+[32m+[m[32m        "X-Content-Type-Options": "nosniff",[m
+[32m+[m[32m      },[m
+[32m+[m[32m    });[m
+[32m+[m[32m  } catch {[m
+[32m+[m[32m    return new NextResponse(null, { status: 404 });[m
+[32m+[m[32m  }[m
+[32m+[m[32m}[m
+\ No newline at end of file[m
+[1mdiff --git a/next.config.ts b/next.config.ts[m
+[1mindex e9ffa30..44e9a91 100644[m
+[1m--- a/next.config.ts[m
+[1m+++ b/next.config.ts[m
+[36m@@ -1,7 +1,34 @@[m
+ import type { NextConfig } from "next";[m
+ [m
+[32m+[m[32mconst securityHeaders = [[m
+[32m+[m[32m  { key: "X-Content-Type-Options", value: "nosniff" },[m
+[32m+[m[32m  { key: "X-Frame-Options", value: "DENY" },[m
+[32m+[m[32m  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },[m
+[32m+[m[32m  {[m
+[32m+[m[32m    key: "Permissions-Policy",[m
+[32m+[m[32m    value: "camera=(), microphone=(), geolocation=()",[m
+[32m+[m[32m  },[m
+[32m+[m[32m  { key: "X-DNS-Prefetch-Control", value: "on" },[m
+[32m+[m[32m];[m
+[32m+[m
+[32m+[m[32mif (process.env.NODE_ENV === "production") {[m
+[32m+[m[32m  securityHeaders.push({[m
+[32m+[m[32m    key: "Strict-Transport-Security",[m
+[32m+[m[32m    value: "max-age=63072000; includeSubDomains; preload",[m
+[32m+[m[32m  });[m
+[32m+[m[32m}[m
+[32m+[m
+ const nextConfig: NextConfig = {[m
+[31m-  /* config options here */[m
+[32m+[m[32m  output: "standalone",[m
+[32m+[m[32m  poweredByHeader: false,[m
+[32m+[m[32m  async headers() {[m
+[32m+[m[32m    return [[m
+[32m+[m[32m      {[m
+[32m+[m[32m        source: "/:path*",[m
+[32m+[m[32m        headers: securityHeaders,[m
+[32m+[m[32m      },[m
+[32m+[m[32m    ];[m
+[32m+[m[32m  },[m
+ };[m
+ [m
+ export default nextConfig;[m
+[1mdiff --git a/public/uploads/.gitkeep b/public/uploads/.gitkeep[m
+[1mnew file mode 100644[m
+[1mindex 0000000..e69de29[m
+[1mdiff --git a/schema/001_init.sql b/schema/001_init.sql[m
+[1mnew file mode 100644[m
+[1mindex 0000000..7a8852b[m
+[1m--- /dev/null[m
+[1m+++ b/schema/001_init.sql[m
+[36m@@ -0,0 +1,203 @@[m
+[32m+[m[32m-- Esquema inicial para entornos de staging/producción.[m
+[32m+[m[32m-- Charset utf8mb4 y zona horaria de sesión UTC (la app formatea America/Bogota).[m
+[32m+[m
+[32m+[m[32mCREATE DATABASE IF NOT EXISTS psicologia[m
+[32m+[m[32m  CHARACTER SET utf8mb4[m
+[32m+[m[32m  COLLATE utf8mb4_unicode_ci;[m
+[32m+[m
+[32m+[m[32mUSE psicologia;[m
+[32m+[m
+[32m+[m[32mCREATE TABLE IF NOT EXISTS administradores ([m
+[32m+[m[32m  id INT NOT NULL AUTO_INCREMENT,[m
+[32m+[m[32m  nombre VARCHAR(150) NOT NULL,[m
+[32m+[m[32m  email VARCHAR(190) NOT NULL,[m
+[32m+[m[32m  password VARCHAR(255) NOT NULL,[m
+[32m+[m[32m  debe_cambiar_password TINYINT(1) NOT NULL DEFAULT 0,[m
+[32m+[m[32m  creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,[m
+[32m+[m[32m  actualizado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,[m
+[32m+[m[32m  PRIMARY KEY (id),[m
+[32m+[m[32m  UNIQUE KEY uq_administradores_email (email)[m
+[32m+[m[32m) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;[m
+[32m+[m
+[32m+[m[32mCREATE TABLE IF NOT EXISTS configuracion_general ([m
+[32m+[m[32m  id INT NOT NULL AUTO_INCREMENT,[m
+[32m+[m[32m  nombre_profesional VARCHAR(190) NOT NULL,[m
+[32m+[m[32m  profesion VARCHAR(190) NOT NULL,[m
+[32m+[m[32m  descripcion TEXT NULL,[m
+[32m+[m[32m  foto_url VARCHAR(500) NULL,[m
+[32m+[m[32m  logo_url VARCHAR(500) NULL,[m
+[32m+[m[32m  whatsapp VARCHAR(40) NULL,[m
+[32m+[m[32m  correo VARCHAR(190) NULL,[m
+[32m+[m[32m  direccion VARCHAR(500) NULL,[m
+[32m+[m[32m  actualizado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,[m
+[32m+[m[32m  PRIMARY KEY (id)[m
+[32m+[m[32m) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;[m
+[32m+[m
+[32m+[m[32mCREATE TABLE IF NOT EXISTS servicios ([m
+[32m+[m[32m  id INT NOT NULL AUTO_INCREMENT,[m
+[32m+[m[32m  nombre VARCHAR(190) NOT NULL,[m
+[32m+[m[32m  descripcion TEXT NULL,[m
+[32m+[m[32m  tipo_servicio ENUM('NORMAL', 'ESPECIAL') NOT NULL DEFAULT 'NORMAL',[m
+[32m+[m[32m  precio DECIMAL(12, 2) NOT NULL DEFAULT 0,[m
+[32m+[m[32m  duracion_minutos INT NOT NULL DEFAULT 60,[m
+[32m+[m[32m  modalidad ENUM('PRESENCIAL', 'VIRTUAL', 'AMBAS') NOT NULL DEFAULT 'PRESENCIAL',[m
+[32m+[m[32m  activo TINYINT(1) NOT NULL DEFAULT 1,[m
+[32m+[m[32m  creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,[m
+[32m+[m[32m  actualizado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,[m
+[32m+[m[32m  PRIMARY KEY (id)[m
+[32m+[m[32m) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;[m
+[32m+[m
+[32m+[m[32mCREATE TABLE IF NOT EXISTS clientes ([m
+[32m+[m[32m  id INT NOT NULL AUTO_INCREMENT,[m
+[32m+[m[32m  nombre_completo VARCHAR(190) NOT NULL,[m
+[32m+[m[32m  email VARCHAR(190) NOT NULL,[m
+[32m+[m[32m  telefono VARCHAR(40) NOT NULL,[m
+[32m+[m[32m  acepta_tratamiento_datos TINYINT(1) NOT NULL DEFAULT 0,[m
+[32m+[m[32m  fecha_aceptacion_datos TIMESTAMP NULL,[m
+[32m+[m[32m  creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,[m
+[32m+[m[32m  actualizado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,[m
+[32m+[m[32m  PRIMARY KEY (id),[m
+[32m+[m[32m  UNIQUE KEY uq_clientes_email (email)[m
+[32m+[m[32m) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;[m
+[32m+[m
+[32m+[m[32mCREATE TABLE IF NOT EXISTS citas ([m
+[32m+[m[32m  id INT NOT NULL AUTO_INCREMENT,[m
+[32m+[m[32m  cliente_id INT NOT NULL,[m
+[32m+[m[32m  servicio_id INT NOT NULL,[m
+[32m+[m[32m  fecha DATE NOT NULL,[m
+[32m+[m[32m  hora TIME NOT NULL,[m
+[32m+[m[32m  modalidad ENUM('PRESENCIAL', 'VIRTUAL') NOT NULL,[m
+[32m+[m[32m  estado ENUM('PENDIENTE', 'CONFIRMADA', 'CANCELADA', 'COMPLETADA') NOT NULL DEFAULT 'PENDIENTE',[m
+[32m+[m[32m  origen_reserva VARCHAR(40) NULL,[m
+[32m+[m[32m  cliente_nombre_registro VARCHAR(190) NULL,[m
+[32m+[m[32m  cliente_telefono_registro VARCHAR(40) NULL,[m
+[32m+[m[32m  google_event_id VARCHAR(255) NULL,[m
+[32m+[m[32m  meet_link VARCHAR(500) NULL,[m
+[32m+[m[32m  token_confirmacion VARCHAR(128) NULL,[m
+[32m+[m[32m  asistencia_confirmada TINYINT(1) NOT NULL DEFAULT 0,[m
+[32m+[m[32m  recordatorio_12h_enviado TINYINT(1) NOT NULL DEFAULT 0,[m
+[32m+[m[32m  creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,[m
+[32m+[m[32m  actualizado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,[m
+[32m+[m[32m  PRIMARY KEY (id),[m
+[32m+[m[32m  KEY idx_citas_fecha_estado (fecha, estado),[m
+[32m+[m[32m  KEY idx_citas_cliente (cliente_id),[m
+[32m+[m[32m  CONSTRAINT fk_citas_cliente FOREIGN KEY (cliente_id) REFERENCES clientes (id),[m
+[32m+[m[32m  CONSTRAINT fk_citas_servicio FOREIGN KEY (servicio_id) REFERENCES servicios (id)[m
+[32m+[m[32m) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;[m
+[32m+[m
+[32m+[m[32mCREATE TABLE IF NOT EXISTS pagos ([m
+[32m+[m[32m  id INT NOT NULL AUTO_INCREMENT,[m
+[32m+[m[32m  cita_id INT NOT NULL,[m
+[32m+[m[32m  referencia VARCHAR(80) NOT NULL,[m
+[32m+[m[32m  transaccion_id VARCHAR(80) NULL,[m
+[32m+[m[32m  monto DECIMAL(12, 2) NOT NULL,[m
+[32m+[m[32m  moneda CHAR(3) NOT NULL DEFAULT 'COP',[m
+[32m+[m[32m  metodo_pago VARCHAR(80) NULL,[m
+[32m+[m[32m  estado ENUM('PENDIENTE', 'APROBADO', 'RECHAZADO', 'CANCELADO') NOT NULL DEFAULT 'PENDIENTE',[m
+[32m+[m[32m  fecha_pago TIMESTAMP NULL,[m
+[32m+[m[32m  creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,[m
+[32m+[m[32m  actualizado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,[m
+[32m+[m[32m  PRIMARY KEY (id),[m
+[32m+[m[32m  UNIQUE KEY uq_pagos_referencia (referencia),[m
+[32m+[m[32m  UNIQUE KEY uq_pagos_transaccion (transaccion_id),[m
+[32m+[m[32m  KEY idx_pagos_cita (cita_id),[m
+[32m+[m[32m  CONSTRAINT fk_pagos_cita FOREIGN KEY (cita_id) REFERENCES citas (id)[m
+[32m+[m[32m) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;[m
+[32m+[m
+[32m+[m[32mCREATE TABLE IF NOT EXISTS disponibilidad ([m
+[32m+[m[32m  id INT NOT NULL AUTO_INCREMENT,[m
+[32m+[m[32m  dia_semana TINYINT NOT NULL,[m
+[32m+[m[32m  hora_inicio TIME NOT NULL,[m
+[32m+[m[32m  hora_fin TIME NOT NULL,[m
+[32m+[m[32m  activo TINYINT(1) NOT NULL DEFAULT 1,[m
+[32m+[m[32m  PRIMARY KEY (id),[m
+[32m+[m[32m  KEY idx_disponibilidad_dia (dia_semana, activo)[m
+[32m+[m[32m) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;[m
+[32m+[m
+[32m+[m[32mCREATE TABLE IF NOT EXISTS disponibilidad_especial ([m
+[32m+[m[32m  id INT NOT NULL AUTO_INCREMENT,[m
+[32m+[m[32m  fecha DATE NOT NULL,[m
+[32m+[m[32m  hora_inicio TIME NULL,[m
+[32m+[m[32m  hora_fin TIME NULL,[m
+[32m+[m[32m  activo TINYINT(1) NOT NULL DEFAULT 1,[m
+[32m+[m[32m  PRIMARY KEY (id),[m
+[32m+[m[32m  KEY idx_disponibilidad_especial_fecha (fecha, activo)[m
+[32m+[m[32m) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;[m
+[32m+[m
+[32m+[m[32mCREATE TABLE IF NOT EXISTS bloqueos_agenda ([m
+[32m+[m[32m  id INT NOT NULL AUTO_INCREMENT,[m
+[32m+[m[32m  inicio DATETIME NOT NULL,[m
+[32m+[m[32m  fin DATETIME NOT NULL,[m
+[32m+[m[32m  activo TINYINT(1) NOT NULL DEFAULT 1,[m
+[32m+[m[32m  creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,[m
+[32m+[m[32m  PRIMARY KEY (id),[m
+[32m+[m[32m  KEY idx_bloqueos_agenda_activo_intervalo (activo, inicio, fin)[m
+[32m+[m[32m) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;[m
+[32m+[m
+[32m+[m[32mCREATE TABLE IF NOT EXISTS trayectoria ([m
+[32m+[m[32m  id INT NOT NULL AUTO_INCREMENT,[m
+[32m+[m[32m  tipo VARCHAR(80) NOT NULL,[m
+[32m+[m[32m  titulo VARCHAR(190) NOT NULL,[m
+[32m+[m[32m  institucion VARCHAR(190) NULL,[m
+[32m+[m[32m  descripcion TEXT NULL,[m
+[32m+[m[32m  fecha_inicio DATE NULL,[m
+[32m+[m[32m  fecha_fin DATE NULL,[m
+[32m+[m[32m  imagen_url VARCHAR(500) NULL,[m
+[32m+[m[32m  orden INT NOT NULL DEFAULT 0,[m
+[32m+[m[32m  activo TINYINT(1) NOT NULL DEFAULT 1,[m
+[32m+[m[32m  creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,[m
+[32m+[m[32m  actualizado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,[m
+[32m+[m[32m  PRIMARY KEY (id)[m
+[32m+[m[32m) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;[m
+[32m+[m
+[32m+[m[32mCREATE TABLE IF NOT EXISTS publicaciones ([m
+[32m+[m[32m  id INT NOT NULL AUTO_INCREMENT,[m
+[32m+[m[32m  titulo VARCHAR(220) NOT NULL,[m
+[32m+[m[32m  resumen TEXT NULL,[m
+[32m+[m[32m  contenido MEDIUMTEXT NOT NULL,[m
+[32m+[m[32m  imagen_url VARCHAR(500) NULL,[m
+[32m+[m[32m  estado ENUM('BORRADOR', 'PUBLICADO') NOT NULL DEFAULT 'BORRADOR',[m
+[32m+[m[32m  fecha_publicacion DATETIME NULL,[m
+[32m+[m[32m  creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,[m
+[32m+[m[32m  actualizado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,[m
+[32m+[m[32m  PRIMARY KEY (id)[m
+[32m+[m[32m) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;[m
+[32m+[m
+[32m+[m[32mCREATE TABLE IF NOT EXISTS testimonios ([m
+[32m+[m[32m  id INT NOT NULL AUTO_INCREMENT,[m
+[32m+[m[32m  nombre VARCHAR(190) NOT NULL,[m
+[32m+[m[32m  comentario TEXT NOT NULL,[m
+[32m+[m[32m  publicado TINYINT(1) NOT NULL DEFAULT 0,[m
+[32m+[m[32m  cita_id INT NULL,[m
+[32m+[m[32m  creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,[m
+[32m+[m[32m  actualizado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,[m
+[32m+[m[32m  PRIMARY KEY (id),[m
+[32m+[m[32m  KEY idx_testimonios_publicado (publicado),[m
+[32m+[m[32m  CONSTRAINT fk_testimonios_cita FOREIGN KEY (cita_id) REFERENCES citas (id)[m
+[32m+[m[32m) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;[m
+[32m+[m
+[32m+[m[32mCREATE TABLE IF NOT EXISTS solicitudes_testimonio ([m
+[32m+[m[32m  id INT NOT NULL AUTO_INCREMENT,[m
+[32m+[m[32m  cita_id INT NOT NULL,[m
+[32m+[m[32m  token_hash VARCHAR(128) NOT NULL,[m
+[32m+[m[32m  estado ENUM('PENDIENTE', 'ENVIADA', 'ERROR', 'RESPONDIDA') NOT NULL DEFAULT 'PENDIENTE',[m
+[32m+[m[32m  intentos INT NOT NULL DEFAULT 0,[m
+[32m+[m[32m  token_expira_en TIMESTAMP NULL,[m
+[32m+[m[32m  enviado_en TIMESTAMP NULL,[m
+[32m+[m[32m  ultimo_error VARCHAR(1000) NULL,[m
+[32m+[m[32m  creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,[m
+[32m+[m[32m  PRIMARY KEY (id),[m
+[32m+[m[32m  UNIQUE KEY uq_solicitudes_testimonio_cita (cita_id),[m
+[32m+[m[32m  CONSTRAINT fk_solicitudes_testimonio_cita FOREIGN KEY (cita_id) REFERENCES citas (id)[m
+[32m+[m[32m) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;[m
+[32m+[m
+[32m+[m[32mCREATE TABLE IF NOT EXISTS google_calendar_config ([m
+[32m+[m[32m  id INT NOT NULL AUTO_INCREMENT,[m
+[32m+[m[32m  email_google VARCHAR(190) NOT NULL,[m
+[32m+[m[32m  refresh_token TEXT NOT NULL,[m
+[32m+[m[32m  calendar_id VARCHAR(190) NOT NULL DEFAULT 'primary',[m
+[32m+[m[32m  activo TINYINT(1) NOT NULL DEFAULT 1,[m
+[32m+[m[32m  creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,[m
+[32m+[m[32m  actualizado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,[m
+[32m+[m[32m  PRIMARY KEY (id)[m
+[32m+[m[32m) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;[m
+[1mdiff --git a/scripts/crear-admin.mjs b/scripts/crear-admin.mjs[m
+[1mindex f572a40..430bd3e 100644[m
+[1m--- a/scripts/crear-admin.mjs[m
+[1m+++ b/scripts/crear-admin.mjs[m
+[36m@@ -1,6 +1,10 @@[m
+ import mysql from "mysql2/promise";[m
+ import crypto from "crypto";[m
+ import readline from "readline";[m
+[32m+[m[32mimport {[m
+[32m+[m[32m  opcionesMysql,[m
+[32m+[m[32m  validarConfiguracionMysql,[m
+[32m+[m[32m} from "./mysql-config.mjs";[m
+ [m
+ const rl = readline.createInterface({[m
+   input: process.stdin,[m
+[36m@@ -43,12 +47,13 @@[m [masync function crearAdministrador() {[m
+ [m
+     const passwordHash = generarHash(password);[m
+ [m
+[31m-    const conexion = await mysql.createConnection({[m
+[31m-      host: "127.0.0.1",[m
+[31m-      user: "root",[m
+[31m-      password: "",[m
+[31m-      database: "psicologia",[m
+[31m-    });[m
+[32m+[m[32m    // Misma configuración que la app: DB_HOST, DB_USER, etc.[m
+[32m+[m[32m    // Nunca root@127.0.0.1 en producción.[m
+[32m+[m[32m    validarConfiguracionMysql();[m
+[32m+[m
+[32m+[m[32m    const conexion = await mysql.createConnection([m
+[32m+[m[32m      opcionesMysql()[m
+[32m+[m[32m    );[m
+ [m
+     await conexion.execute([m
+       `[m
+[1mdiff --git a/scripts/migrar-bloqueos-agenda.mjs b/scripts/migrar-bloqueos-agenda.mjs[m
+[1mindex f5f1ffb..0c2c3fe 100644[m
+[1m--- a/scripts/migrar-bloqueos-agenda.mjs[m
+[1m+++ b/scripts/migrar-bloqueos-agenda.mjs[m
+[36m@@ -1,11 +1,9 @@[m
+ import mysql from "mysql2/promise";[m
+[32m+[m[32mimport { opcionesMysql } from "./mysql-config.mjs";[m
+ [m
+[31m-const connection = await mysql.createConnection({[m
+[31m-  host: process.env.DB_HOST || "127.0.0.1",[m
+[31m-  user: process.env.DB_USER || "root",[m
+[31m-  password: process.env.DB_PASSWORD || "",[m
+[31m-  database: process.env.DB_NAME || "psicologia",[m
+[31m-});[m
+[32m+[m[32mconst connection = await mysql.createConnection([m
+[32m+[m[32m  opcionesMysql()[m
+[32m+[m[32m);[m
+ [m
+ try {[m
+   await connection.query(`[m
+[1mdiff --git a/scripts/migrar-tipo-servicio.mjs b/scripts/migrar-tipo-servicio.mjs[m
+[1mindex 1799381..0ffae1d 100644[m
+[1m--- a/scripts/migrar-tipo-servicio.mjs[m
+[1m+++ b/scripts/migrar-tipo-servicio.mjs[m
+[36m@@ -1,11 +1,9 @@[m
+ import mysql from "mysql2/promise";[m
+[32m+[m[32mimport { opcionesMysql } from "./mysql-config.mjs";[m
+ [m
+[31m-const connection = await mysql.createConnection({[m
+[31m-  host: process.env.DB_HOST || "127.0.0.1",[m
+[31m-  user: process.env.DB_USER || "root",[m
+[31m-  password: process.env.DB_PASSWORD || "",[m
+[31m-  database: process.env.DB_NAME || "psicologia",[m
+[31m-});[m
+[32m+[m[32mconst connection = await mysql.createConnection([m
+[32m+[m[32m  opcionesMysql()[m
+[32m+[m[32m);[m
+ [m
+ try {[m
+   const [columnas] = await connection.query([m
+[1mdiff --git a/scripts/mysql-config.mjs b/scripts/mysql-config.mjs[m
+[1mnew file mode 100644[m
+[1mindex 0000000..aeda058[m
+[1m--- /dev/null[m
+[1m+++ b/scripts/mysql-config.mjs[m
+[36m@@ -0,0 +1,90 @@[m
+[32m+[m[32mimport { existsSync, readFileSync } from "fs";[m
+[32m+[m[32mimport { resolve } from "path";[m
+[32m+[m
+[32m+[m[32mfunction cargarEnvLocal() {[m
+[32m+[m[32m  const ruta = resolve(process.cwd(), ".env");[m
+[32m+[m
+[32m+[m[32m  if (!existsSync(ruta)) {[m
+[32m+[m[32m    return;[m
+[32m+[m[32m  }[m
+[32m+[m
+[32m+[m[32m  const texto = readFileSync(ruta, "utf8");[m
+[32m+[m
+[32m+[m[32m  for (const linea of texto.split(/\r?\n/)) {[m
+[32m+[m[32m    const recorte = linea.trim();[m
+[32m+[m
+[32m+[m[32m    if (!recorte || recorte.startsWith("#")) {[m
+[32m+[m[32m      continue;[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    const separador = recorte.indexOf("=");[m
+[32m+[m
+[32m+[m[32m    if (separador <= 0) {[m
+[32m+[m[32m      continue;[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    const clave = recorte.slice(0, separador).trim();[m
+[32m+[m[32m    let valor = recorte.slice(separador + 1).trim();[m
+[32m+[m
+[32m+[m[32m    if ([m
+[32m+[m[32m      (valor.startsWith('"') && valor.endsWith('"')) ||[m
+[32m+[m[32m      (valor.startsWith("'") && valor.endsWith("'"))[m
+[32m+[m[32m    ) {[m
+[32m+[m[32m      valor = valor.slice(1, -1);[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    if (process.env[clave] === undefined) {[m
+[32m+[m[32m      process.env[clave] = valor;[m
+[32m+[m[32m    }[m
+[32m+[m[32m  }[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mcargarEnvLocal();[m
+[32m+[m
+[32m+[m[32m// Los scripts de ops usan las mismas variables que la app.[m
+[32m+[m[32m// En producción exigen configuración completa y rechazan root.[m
+[32m+[m[32mexport function validarConfiguracionMysql() {[m
+[32m+[m[32m  if (process.env.NODE_ENV !== "production") {[m
+[32m+[m[32m    return;[m
+[32m+[m[32m  }[m
+[32m+[m
+[32m+[m[32m  const faltantes = [];[m
+[32m+[m
+[32m+[m[32m  if (!process.env.DB_HOST) faltantes.push("DB_HOST");[m
+[32m+[m[32m  if (!process.env.DB_USER) faltantes.push("DB_USER");[m
+[32m+[m[32m  if (process.env.DB_PASSWORD === undefined) {[m
+[32m+[m[32m    faltantes.push("DB_PASSWORD");[m
+[32m+[m[32m  }[m
+[32m+[m[32m  if (!process.env.DB_NAME) faltantes.push("DB_NAME");[m
+[32m+[m
+[32m+[m[32m  if (faltantes.length > 0) {[m
+[32m+[m[32m    throw new Error([m
+[32m+[m[32m      `Faltan variables de base de datos en producción: ${faltantes.join(", ")}.`[m
+[32m+[m[32m    );[m
+[32m+[m[32m  }[m
+[32m+[m
+[32m+[m[32m  if (process.env.DB_USER === "root") {[m
+[32m+[m[32m    throw new Error([m
+[32m+[m[32m      "DB_USER=root no es adecuado en producción. Usa un usuario con privilegios mínimos."[m
+[32m+[m[32m    );[m
+[32m+[m[32m  }[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mexport function opcionesMysql() {[m
+[32m+[m[32m  const ssl =[m
+[32m+[m[32m    process.env.DB_SSL === "true" || process.env.DB_SSL === "1"[m
+[32m+[m[32m      ? {[m
+[32m+[m[32m          rejectUnauthorized:[m
+[32m+[m[32m            process.env.DB_SSL_REJECT_UNAUTHORIZED !== "false",[m
+[32m+[m[32m        }[m
+[32m+[m[32m      : undefined;[m
+[32m+[m
+[32m+[m[32m  return {[m
+[32m+[m[32m    host: process.env.DB_HOST || "127.0.0.1",[m
+[32m+[m[32m    port: Number(process.env.DB_PORT || 3306),[m
+[32m+[m[32m    user: process.env.DB_USER || "root",[m
+[32m+[m[32m    password: process.env.DB_PASSWORD || "",[m
+[32m+[m[32m    database: process.env.DB_NAME || "psicologia",[m
+[32m+[m[32m    ssl,[m
+[32m+[m[32m  };[m
+[32m+[m[32m}[m
+[1mdiff --git a/scripts/respaldo-mysql.mjs b/scripts/respaldo-mysql.mjs[m
+[1mnew file mode 100644[m
+[1mindex 0000000..a1d1ece[m
+[1m--- /dev/null[m
+[1m+++ b/scripts/respaldo-mysql.mjs[m
+[36m@@ -0,0 +1,82 @@[m
+[32m+[m[32m// Respaldo de la base de datos con mysqldump.[m
+[32m+[m[32m//[m
+[32m+[m[32m// Uso:[m
+[32m+[m[32m//   node scripts/respaldo-mysql.mjs [destino][m
+[32m+[m[32m//[m
+[32m+[m[32m// El destino por defecto es ./respaldos. Genera un[m
+[32m+[m[32m// archivo psicologia-<fecha>.sql.gz comprimido.[m
+[32m+[m[32m//[m
+[32m+[m[32m// Requiere mysqldump en el PATH y las mismas[m
+[32m+[m[32m// variables DB_* que la app (lee .env si existe).[m
+[32m+[m
+[32m+[m[32mimport { spawn } from "child_process";[m
+[32m+[m[32mimport { createWriteStream, mkdirSync, existsSync } from "fs";[m
+[32m+[m[32mimport { createGzip } from "zlib";[m
+[32m+[m[32mimport { resolve } from "path";[m
+[32m+[m[32mimport { opcionesMysql, validarConfiguracionMysql } from "./mysql-config.mjs";[m
+[32m+[m
+[32m+[m[32mvalidarConfiguracionMysql();[m
+[32m+[m
+[32m+[m[32mconst opciones = opcionesMysql();[m
+[32m+[m
+[32m+[m[32mconst destino = process.argv[2][m
+[32m+[m[32m  ? resolve(process.argv[2])[m
+[32m+[m[32m  : resolve(process.cwd(), "respaldos");[m
+[32m+[m
+[32m+[m[32mif (!existsSync(destino)) {[m
+[32m+[m[32m  mkdirSync(destino, { recursive: true });[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mconst marca = new Date()[m
+[32m+[m[32m  .toISOString()[m
+[32m+[m[32m  .slice(0, 19)[m
+[32m+[m[32m  .replace(/[:T]/g, "-");[m
+[32m+[m
+[32m+[m[32mconst archivo = resolve(destino, `psicologia-${marca}.sql.gz`);[m
+[32m+[m
+[32m+[m[32mconst argumentos = [[m
+[32m+[m[32m  `--host=${opciones.host}`,[m
+[32m+[m[32m  `--port=${opciones.port}`,[m
+[32m+[m[32m  `--user=${opciones.user}`,[m
+[32m+[m[32m  "--single-transaction",[m
+[32m+[m[32m  "--routines",[m
+[32m+[m[32m  "--triggers",[m
+[32m+[m[32m  "--default-character-set=utf8mb4",[m
+[32m+[m[32m  opciones.database,[m
+[32m+[m[32m];[m
+[32m+[m
+[32m+[m[32m// La contraseña viaja por variable de entorno,[m
+[32m+[m[32m// no por la línea de comandos.[m
+[32m+[m[32mconst entorno = {[m
+[32m+[m[32m  ...process.env,[m
+[32m+[m[32m  MYSQL_PWD: opciones.password || "",[m
+[32m+[m[32m};[m
+[32m+[m
+[32m+[m[32mconst volcado = spawn("mysqldump", argumentos, { env: entorno });[m
+[32m+[m[32mconst compresor = createGzip();[m
+[32m+[m[32mconst salida = createWriteStream(archivo);[m
+[32m+[m
+[32m+[m[32mvolcado.stdout.pipe(compresor).pipe(salida);[m
+[32m+[m
+[32m+[m[32mvolcado.stderr.on("data", (datos) => {[m
+[32m+[m[32m  console.error(`mysqldump: ${datos}`);[m
+[32m+[m[32m});[m
+[32m+[m
+[32m+[m[32mvolcado.on("error", (error) => {[m
+[32m+[m[32m  console.error("No fue posible ejecutar mysqldump:", error.message);[m
+[32m+[m[32m  process.exit(1);[m
+[32m+[m[32m});[m
+[32m+[m
+[32m+[m[32msalida.on("error", (error) => {[m
+[32m+[m[32m  console.error("No fue posible escribir el respaldo:", error.message);[m
+[32m+[m[32m  process.exit(1);[m
+[32m+[m[32m});[m
+[32m+[m
+[32m+[m[32mvolcado.on("close", (codigo) => {[m
+[32m+[m[32m  if (codigo !== 0) {[m
+[32m+[m[32m    console.error(`mysqldump terminó con código ${codigo}.`);[m
+[32m+[m[32m    process.exit(codigo);[m
+[32m+[m[32m  }[m
+[32m+[m
+[32m+[m[32m  console.log(`✅ Respaldo creado: ${archivo}`);[m
+[32m+[m[32m});[m
+[1mdiff --git a/scripts/restablecer-admin.mjs b/scripts/restablecer-admin.mjs[m
+[1mindex 88925a3..d18ff33 100644[m
+[1m--- a/scripts/restablecer-admin.mjs[m
+[1m+++ b/scripts/restablecer-admin.mjs[m
+[36m@@ -1,6 +1,10 @@[m
+ import mysql from "mysql2/promise";[m
+ import crypto from "crypto";[m
+ import readline from "readline";[m
+[32m+[m[32mimport {[m
+[32m+[m[32m  opcionesMysql,[m
+[32m+[m[32m  validarConfiguracionMysql,[m
+[32m+[m[32m} from "./mysql-config.mjs";[m
+ [m
+ const rl = readline.createInterface({[m
+   input: process.stdin,[m
+[36m@@ -51,12 +55,13 @@[m [masync function restablecerAdministrador() {[m
+       );[m
+     }[m
+ [m
+[31m-    conexion = await mysql.createConnection({[m
+[31m-      host: "127.0.0.1",[m
+[31m-      user: "root",[m
+[31m-      password: "",[m
+[31m-      database: "psicologia",[m
+[31m-    });[m
+[32m+[m[32m    // Misma configuración que la app: DB_HOST, DB_USER, etc.[m
+[32m+[m[32m    // Nunca root@127.0.0.1 en producción.[m
+[32m+[m[32m    validarConfiguracionMysql();[m
+[32m+[m
+[32m+[m[32m    conexion = await mysql.createConnection([m
+[32m+[m[32m      opcionesMysql()[m
+[32m+[m[32m    );[m
+ [m
+     const [filas] = await conexion.execute([m
+       `[m
