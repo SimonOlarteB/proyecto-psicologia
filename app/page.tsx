@@ -923,7 +923,7 @@ export default async function Home() {
       {/* WHATSAPP FLOTANTE */}
       {whatsappLink && (
         <a
-          href={`https://wa.me/${whatsappLink}`}
+          href={`https://wa.me/${whatsappLink}?text=${encodeURIComponent("Gracias por comunicarte con Aurapsicohumana/ Atencion Psicologica,\n¿Como podemos ayudarte?")}`}
           target="_blank"
           rel="noopener noreferrer"
           aria-label="Contactar por WhatsApp"

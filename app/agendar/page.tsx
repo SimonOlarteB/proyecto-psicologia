@@ -868,7 +868,7 @@ export default function AgendarPage() {
               {/* FECHA Y HORA */}
 
               <div className="mt-8 grid gap-5 md:grid-cols-2">
-                <div>
+                <div className="min-w-0">
                   <label className="mb-2 block text-sm font-medium">
                     Fecha
                   </label>
@@ -882,11 +882,11 @@ export default function AgendarPage() {
                         .toISOString()
                         .split("T")[0]
                     }
-                    className="w-full rounded-xl border border-[#D8D0C5] bg-white px-4 py-3 outline-none focus:border-[#C56835]"
+                    className="box-border block w-full min-w-0 rounded-xl border border-[#D8D0C5] bg-white px-4 py-3 outline-none focus:border-[#C56835]"
                   />
 
                   {fecha && !hayHoraDisponible && (
-                    <div className="mt-3 rounded-xl bg-[#F7F1E9] p-4 text-sm text-[#59614D]">
+                    <div className="mt-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
                       {!servicioActual ? (
                         <p>
                           No hay horarios disponibles este día. Selecciona un servicio para buscar el próximo espacio según su duración.
@@ -909,7 +909,7 @@ export default function AgendarPage() {
                           <button
                             type="button"
                             onClick={() => void cargarFecha(resultadoProximaDisponibilidad.proxima!.fecha)}
-                            className="self-start font-medium text-[#C56835] underline"
+                            className="self-start font-medium text-red-700 underline"
                           >
                             Ver ese día
                           </button>
@@ -921,7 +921,7 @@ export default function AgendarPage() {
                   )}
                 </div>
 
-                <div>
+                <div className="min-w-0">
                   <label className="mb-2 block text-sm font-medium">
                     Hora
                   </label>
@@ -932,7 +932,7 @@ export default function AgendarPage() {
                       setHora(e.target.value)
                     }
                     disabled={!fecha}
-                    className="w-full rounded-xl border border-[#D8D0C5] bg-white px-4 py-3 outline-none focus:border-[#C56835] disabled:bg-[#F7F1E9] disabled:text-[#999]"
+                    className="box-border block w-full min-w-0 rounded-xl border border-[#D8D0C5] bg-white px-4 py-3 outline-none focus:border-[#C56835] disabled:bg-[#F7F1E9] disabled:text-[#999]"
                   >
                     <option value="">
                       {fecha
