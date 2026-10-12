@@ -882,7 +882,7 @@ export default function AgendarPage() {
                         .toISOString()
                         .split("T")[0]
                     }
-                    className="box-border block w-full min-w-0 rounded-xl border border-[#D8D0C5] bg-white px-4 py-3 outline-none focus:border-[#C56835]"
+                    className="date-input box-border block w-full min-w-0 rounded-xl border border-[#D8D0C5] bg-white px-4 py-3 outline-none focus:border-[#C56835]"
                   />
 
                   {fecha && !hayHoraDisponible && (

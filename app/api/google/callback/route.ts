@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { google } from "googleapis";
 import type { RowDataPacket } from "mysql2";
 import pool from "./../../../lib/db";
+import { obtenerAppUrl } from "./../../../lib/app-url";
 import { cifrarToken } from "./../../../lib/seguridad-tokens";
 
 export async function GET(request: Request) {
@@ -180,7 +181,7 @@ const emailGoogle = "Cuenta Google";
     // =====================================================
 
     const respuesta = NextResponse.redirect(
-      new URL("/admin", request.url)
+      new URL("/admin", obtenerAppUrl())
     );
 
     respuesta.cookies.delete("google_oauth_state");

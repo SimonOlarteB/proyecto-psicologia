@@ -58,6 +58,45 @@ select {
   font: inherit;
 }
 
+input[type="date"] {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 3.25rem;
+  height: 3.25rem;
+  padding: 0.75rem 1rem;
+  line-height: 1.25;
+  font-size: 1rem;
+  color: var(--foreground);
+  background: var(--white);
+  border: 1px solid #D8D0C5;
+  border-radius: 0.75rem;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+input[type="date"]::-webkit-date-and-time-value {
+  text-align: left;
+  padding: 0;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.8;
+  margin-left: 0.25rem;
+}
+
+input[type="date"].date-input {
+  box-sizing: border-box;
+  -webkit-appearance: none;
+  appearance: none;
+  background-color: var(--white);
+  border: 1px solid #D8D0C5;
+  border-radius: 0.75rem;
+  color: var(--foreground);
+}
+
 ::selection {
   background: var(--sage);
   color: var(--white);
