@@ -127,31 +127,25 @@ export async function crearEventoGoogleCalendar(
 
   const evento = await calendar.events.insert({
     calendarId,
-
     conferenceDataVersion: 1,
-
     sendUpdates: "none",
-
+    supportsAttachments: true,
     requestBody: {
       summary: `Cita psicológica - ${params.nombreCliente}`,
-
       description: [
         `Servicio: ${params.nombreServicio}`,
         `Cliente: ${params.nombreCliente}`,
         `Correo: ${params.emailCliente}`,
         `Modalidad: ${params.modalidad}`,
       ].join("\n"),
-
       start: {
         dateTime: formatearFechaBogota(inicio),
         timeZone: "America/Bogota",
       },
-
       end: {
         dateTime: formatearFechaBogota(fin),
         timeZone: "America/Bogota",
       },
-
       attendees: params.emailCliente
         ? [
             {
@@ -160,11 +154,9 @@ export async function crearEventoGoogleCalendar(
             },
           ]
         : undefined,
-
       conferenceData: {
         createRequest: {
           requestId,
-
           conferenceSolutionKey: {
             type: "hangoutsMeet",
           },
@@ -216,6 +208,10 @@ export async function crearEventoGoogleCalendar(
           ?.createRequest?.status?.statusCode ===
         "failure"
       ) {
+        console.warn(
+          "Google Calendar devolvió un createRequest en failure para el evento:",
+          { eventId, calendarId }
+        );
         break;
       }
     } catch (error) {
@@ -226,7 +222,13 @@ export async function crearEventoGoogleCalendar(
   if (!meetLink) {
     console.error(
       "Google Calendar no generó el enlace de Meet para el evento:",
-      { eventId, ultimoError }
+      {
+        eventId,
+        calendarId,
+        summary: `Cita psicológica - ${params.nombreCliente}`,
+        ultimoError,
+        eventoRespuesta: evento.data,
+      }
     );
   }
 
@@ -598,6 +600,22 @@ function extraerMeetLink(
   const entries =
     conferenceData?.entryPoints || [];
 
+  const uriValido =
+    (valor: unknown): valor is string =>
+      typeof valor === "string" &&
+      valor.length > 0 &&
+      /meet\.google\.com|hangouts\.google\.com/i.test(
+        valor
+      );
+
+  const entryPorUri = entries.find(
+    (entry) => uriValido(entry.uri)
+  );
+
+  if (entryPorUri?.uri) {
+    return entryPorUri.uri;
+  }
+
   const videoEntry =
     entries.find(
       (entry) =>
@@ -607,7 +625,5 @@ function extraerMeetLink(
           "string"
     );
 
-  return (
-    videoEntry?.uri || null
-  );
+  return videoEntry?.uri || null;
 }

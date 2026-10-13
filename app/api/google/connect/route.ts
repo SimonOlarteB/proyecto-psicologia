@@ -65,13 +65,14 @@ export async function GET(request: Request) {
     // =====================================================
 
     const authorizationUrl = oauth2Client.generateAuthUrl({
-  access_type: "offline",
-  prompt: "consent select_account",
-  scope: [
-    "https://www.googleapis.com/auth/calendar.events",
-  ],
-  state,
-});
+      access_type: "offline",
+      prompt: "consent select_account",
+      scope: [
+        "https://www.googleapis.com/auth/calendar.events",
+        "https://www.googleapis.com/auth/calendar",
+      ],
+      state,
+    });
     // =====================================================
     // GUARDAR STATE EN COOKIE
     // =====================================================
