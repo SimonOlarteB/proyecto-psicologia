@@ -89,6 +89,8 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
 input[type="date"].date-input {
   box-sizing: border-box;
+  min-height: 3.125rem;
+  height: 3.125rem;
   -webkit-appearance: none;
   appearance: none;
   background-color: var(--white);

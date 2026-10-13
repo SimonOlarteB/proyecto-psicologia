@@ -73,19 +73,23 @@ Vercel solo si se cambia la arquitectura: el filesystem efímero rompe los uploa
 
 ### Crons
 
-Los recordatorios viven en dos rutas que exigen `Authorization: Bearer <CRON_SECRET>`:
+Configura los crons en **hPanel de Hostinger > Avanzado > Cron Jobs**. No necesitas GitHub Actions ni un cron de Vercel. Crea dos tareas, cada 15 minutos, con estos comandos:
 
-- `GET /api/recordatorios/12-horas`
-- `GET /api/recordatorios/testimonios`
+Recordatorios de citas:
 
-Vercel crons **no** puede enviar ese header, así que usa GitHub Actions (ya está incluido en [`.github/workflows/cron.yml`](./.github/workflows/cron.yml); define los secrets `APP_URL` y `CRON_SECRET` en el repo) o el crontab del VPS:
-
-```cron
-*/15 * * * * curl -fsS --max-time 300 -H "Authorization: Bearer $CRON_SECRET" https://tudominio.com/api/recordatorios/12-horas
-*/15 * * * * curl -fsS --max-time 300 -H "Authorization: Bearer $CRON_SECRET" https://tudominio.com/api/recordatorios/testimonios
+```bash
+curl -fsS --max-time 300 -H "Authorization: Bearer <CRON_SECRET>" https://tudominio.com/api/recordatorios/12-horas
 ```
 
-Puedes probarlas manualmente con `?dryRun=1` en la de 12 horas.
+Invitaciones a testimonios:
+
+```bash
+curl -fsS --max-time 300 -H "Authorization: Bearer <CRON_SECRET>" https://tudominio.com/api/recordatorios/testimonios
+```
+
+Reemplaza `https://tudominio.com` por el dominio publico de la app y `<CRON_SECRET>` por el mismo secreto configurado como variable de entorno en la aplicacion de Hostinger. Configura la frecuencia de cada tarea en hPanel (cada 15 minutos); no ejecutes estos comandos localmente como proceso permanente.
+
+Para probar la consulta de citas sin enviar correos ni modificar datos, anade `?dryRun=1` a la ruta de 12 horas y conserva el encabezado de autorizacion. `APP_URL`, `CRON_SECRET`, `RESEND_API_KEY` y `RESEND_FROM_EMAIL` deben estar configuradas en el entorno de produccion de Hostinger.
 
 ### Almacenamiento de imágenes
 
