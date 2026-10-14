@@ -106,7 +106,7 @@ function formatearFecha(fecha: string | Date): string {
 
       if (/^\d{4}-\d{2}-\d{2}$/.test(valor)) {
         const [anio, mes, dia] = valor.split("-").map(Number);
-        fechaObjeto = new Date(anio, mes - 1, dia);
+        fechaObjeto = new Date(Date.UTC(anio, mes - 1, dia));
       } else {
         fechaObjeto = new Date(valor);
       }
@@ -114,7 +114,7 @@ function formatearFecha(fecha: string | Date): string {
 
     return new Intl.DateTimeFormat("es-CO", {
       dateStyle: "full",
-      timeZone: "America/Bogota",
+      timeZone: "UTC",
     }).format(fechaObjeto);
   } catch {
     return String(fecha);

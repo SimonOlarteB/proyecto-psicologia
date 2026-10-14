@@ -50,7 +50,7 @@ export function descifrarToken(valor: string): string {
   }
 
   const clave = claveDeCifrado();
-  const [, ivHex, etiquetaHex, cifradoHex] =
+  const [, , ivHex, etiquetaHex, cifradoHex] =
     valor.split(":");
 
   if (!ivHex || !etiquetaHex || !cifradoHex) {
