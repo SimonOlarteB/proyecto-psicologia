@@ -6,6 +6,7 @@ import {
   intervalosFechaHoraSeCruzan,
   horariosSeCruzan,
   minutosDesdeHora,
+  obtenerFechasHabiles,
 } from "../../../lib/horarios";
 
 type ServicioRow = RowDataPacket & { duracion_minutos: number };
@@ -123,6 +124,8 @@ export async function GET(request: Request) {
     const citasExistentes = citas[0];
     const bloqueosActivos = bloqueos[0];
     const duracion = Number(servicios[0].duracion_minutos) || 60;
+    const esDuracionEnDias = duracion >= 1440 && duracion % 1440 === 0;
+    const duracionValidada = esDuracionEnDias ? 60 : duracion;
     const fechaBase = new Date(`${desde}T12:00:00Z`);
 
     for (let desplazamiento = 1; desplazamiento <= 365; desplazamiento += 1) {
@@ -137,31 +140,76 @@ export async function GET(request: Request) {
         : horariosSemanales.filter(
             (item) => Number(item.dia_semana) === fechaCandidata.getUTCDay()
           );
-      const citasDelDia = citasExistentes.filter((cita) => cita.fecha === fecha);
 
       for (const horario of horarios) {
         if (!horario.hora_inicio || !horario.hora_fin) continue;
 
         for (const hora of generarHoras(horario.hora_inicio, horario.hora_fin)) {
-          if (minutosDesdeHora(hora) + duracion > minutosDesdeHora(horario.hora_fin)) {
+          if (
+            minutosDesdeHora(hora) + duracionValidada >
+            minutosDesdeHora(horario.hora_fin)
+          ) {
             continue;
           }
 
-          const finCandidata = agregarMinutosAFechaHora(fecha, hora, duracion);
-          const inicioCandidata = `${fecha}T${hora}`;
-          const cruzaCita = citasDelDia.some((cita) =>
-            horariosSeCruzan(hora, duracion, cita.hora, Number(cita.duracion_minutos) || 60)
-          );
-          const cruzaBloqueo = bloqueosActivos.some((bloqueo) =>
-            intervalosFechaHoraSeCruzan(
-              inicioCandidata,
-              finCandidata,
-              bloqueo.inicio,
-              bloqueo.fin
-            )
-          );
+          const fechasServicio = esDuracionEnDias
+            ? obtenerFechasHabiles(fecha, duracion / 1440)
+            : [fecha];
+          const diasDisponibles = fechasServicio.every((fechaServicio) => {
+            const fechaTrabajo = new Date(`${fechaServicio}T12:00:00Z`);
+            const especialTrabajo = fechasEspeciales.find(
+              (item) => item.fecha === fechaServicio
+            );
+            const horariosTrabajo = especialTrabajo
+              ? especialTrabajo.hora_inicio && especialTrabajo.hora_fin
+                ? [especialTrabajo]
+                : []
+              : horariosSemanales.filter(
+                  (item) =>
+                    Number(item.dia_semana) === fechaTrabajo.getUTCDay()
+                );
 
-          if (!cruzaCita && !cruzaBloqueo) {
+            const horarioDisponible = horariosTrabajo.find(
+              (item) =>
+                item.hora_inicio &&
+                item.hora_fin &&
+                minutosDesdeHora(hora) + duracionValidada <=
+                  minutosDesdeHora(item.hora_fin) &&
+                minutosDesdeHora(hora) >= minutosDesdeHora(item.hora_inicio)
+            );
+
+            if (!horarioDisponible) return false;
+
+            const citasDelDia = citasExistentes.filter(
+              (cita) => cita.fecha === fechaServicio
+            );
+            const inicioCandidata = `${fechaServicio}T${hora}`;
+            const finCandidata = agregarMinutosAFechaHora(
+              fechaServicio,
+              hora,
+              duracionValidada
+            );
+            const cruzaCita = citasDelDia.some((cita) =>
+              horariosSeCruzan(
+                hora,
+                duracionValidada,
+                cita.hora,
+                Number(cita.duracion_minutos) || 60
+              )
+            );
+            const cruzaBloqueo = bloqueosActivos.some((bloqueo) =>
+              intervalosFechaHoraSeCruzan(
+                inicioCandidata,
+                finCandidata,
+                bloqueo.inicio,
+                bloqueo.fin
+              )
+            );
+
+            return !cruzaCita && !cruzaBloqueo;
+          });
+
+          if (diasDisponibles) {
             return NextResponse.json({ proxima: { fecha, hora } });
           }
         }

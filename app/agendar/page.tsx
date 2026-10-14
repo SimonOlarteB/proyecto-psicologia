@@ -8,6 +8,7 @@ import {
   intervalosFechaHoraSeCruzan,
   horariosSeCruzan,
   minutosDesdeHora,
+  obtenerFechasHabiles,
 } from "../lib/horarios";
 
 type Servicio = {
@@ -24,6 +25,11 @@ type Servicio = {
 type BloqueoAgenda = {
   inicio: string;
   fin: string;
+};
+
+type OcupacionServicio = {
+  citas: { hora: string; duracion_minutos: number }[];
+  bloqueos: BloqueoAgenda[];
 };
 
 type ResultadoProximaDisponibilidad = {
@@ -175,6 +181,83 @@ export default function AgendarPage() {
     (servicio) =>
       String(servicio.id) === servicioSeleccionado
   );
+  const duracionServicio = Number(servicioActual?.duracion_minutos) || 60;
+  const esServicioPorDias =
+    duracionServicio >= 1440 && duracionServicio % 1440 === 0;
+  const diasServicio = esServicioPorDias
+    ? duracionServicio / 1440
+    : 0;
+  const [ocupacionServicio, setOcupacionServicio] = useState<{
+    clave: string;
+    porFecha: Record<string, OcupacionServicio>;
+  } | null>(null);
+  const claveOcupacionServicio = `${fecha}:${duracionServicio}`;
+
+  useEffect(() => {
+    if (!fecha || !esServicioPorDias) {
+      return;
+    }
+
+    let cancelada = false;
+    const fechasServicio = obtenerFechasHabiles(fecha, diasServicio);
+
+    async function cargarOcupacionServicio() {
+      try {
+        const ocupaciones = await Promise.all(
+          fechasServicio.map(async (fechaServicio) => {
+            const [respuestaCitas, respuestaBloqueos] = await Promise.all([
+              fetch(`/api/citas?fecha=${encodeURIComponent(fechaServicio)}`),
+              fetch(
+                `/api/bloqueos-agenda?fecha=${encodeURIComponent(fechaServicio)}`
+              ),
+            ]);
+
+            if (!respuestaCitas.ok || !respuestaBloqueos.ok) {
+              throw new Error(
+                `No se pudo consultar la disponibilidad del ${fechaServicio}.`
+              );
+            }
+
+            const citas = await respuestaCitas.json();
+            const bloqueos = await respuestaBloqueos.json();
+
+            return [
+              fechaServicio,
+              {
+                citas: citas.map(
+                  (cita: { hora: string; duracion_minutos: number }) => ({
+                    hora: cita.hora.substring(0, 5),
+                    duracion_minutos: Number(cita.duracion_minutos) || 60,
+                  })
+                ),
+                bloqueos,
+              },
+            ] as const;
+          })
+        );
+
+        if (!cancelada) {
+          setOcupacionServicio({
+            clave: claveOcupacionServicio,
+            porFecha: Object.fromEntries(ocupaciones),
+          });
+        }
+      } catch (error) {
+        console.error("Error cargando disponibilidad del servicio:", error);
+      }
+    }
+
+    void cargarOcupacionServicio();
+
+    return () => {
+      cancelada = true;
+    };
+  }, [
+    fecha,
+    esServicioPorDias,
+    diasServicio,
+    claveOcupacionServicio,
+  ]);
 
   const modalidadesPermitidas:
     ("PRESENCIAL" | "VIRTUAL")[] = servicioActual
@@ -184,12 +267,67 @@ export default function AgendarPage() {
     : [];
 
   function obtenerEstadoHora(horaDisponible: string) {
-    const duracionSeleccionada =
-      Number(servicioActual?.duracion_minutos) || 60;
+    const duracionValidada = esServicioPorDias ? 60 : duracionServicio;
     const inicioDisponible = minutosDesdeHora(horaDisponible);
-    const finServicio = inicioDisponible + duracionSeleccionada;
-    const excedeDisponibilidad =
+    const finServicio = inicioDisponible + duracionValidada;
+    let excedeDisponibilidad =
       finServicio > minutosDesdeHora(horaFinDisponibilidad);
+
+    if (esServicioPorDias && fecha) {
+      const fechasServicio = obtenerFechasHabiles(fecha, diasServicio);
+      const ocupaciones =
+        ocupacionServicio?.clave === claveOcupacionServicio
+          ? ocupacionServicio.porFecha
+          : null;
+
+      excedeDisponibilidad = fechasServicio.some((fechaServicio) => {
+        const diaSemana = new Date(`${fechaServicio}T12:00:00Z`).getUTCDay();
+        const disponibilidadEspecial = disponibilidadesEspeciales.find(
+          (item) => item.fecha?.slice(0, 10) === fechaServicio
+        );
+        const horario = disponibilidadEspecial
+          ? disponibilidadEspecial.hora_inicio && disponibilidadEspecial.hora_fin
+            ? disponibilidadEspecial
+            : null
+          : disponibilidad.find((item) => Number(item.dia_semana) === diaSemana);
+
+        if (
+          !horario?.hora_inicio ||
+          !horario.hora_fin ||
+          inicioDisponible < minutosDesdeHora(horario.hora_inicio) ||
+          inicioDisponible + 60 > minutosDesdeHora(horario.hora_fin) ||
+          !ocupaciones?.[fechaServicio]
+        ) {
+          return true;
+        }
+
+        const ocupacion = ocupaciones[fechaServicio];
+        const hayCita = ocupacion.citas.some((cita) =>
+          horariosSeCruzan(
+            horaDisponible,
+            60,
+            cita.hora,
+            cita.duracion_minutos
+          )
+        );
+        const finDiaServicio = agregarMinutosAFechaHora(
+          fechaServicio,
+          horaDisponible,
+          60
+        );
+        const hayBloqueo = ocupacion.bloqueos.some((bloqueo) =>
+          intervalosFechaHoraSeCruzan(
+            `${fechaServicio}T${horaDisponible}`,
+            finDiaServicio,
+            bloqueo.inicio,
+            bloqueo.fin
+          )
+        );
+
+        return hayCita || hayBloqueo;
+      });
+    }
+
     const seCruzaConCita = horasOcupadas.some((cita) => {
       const inicioCita = minutosDesdeHora(cita.hora);
 
@@ -197,7 +335,7 @@ export default function AgendarPage() {
         (inicioCita >= inicioDisponible && inicioCita < finServicio) ||
         horariosSeCruzan(
           horaDisponible,
-          duracionSeleccionada,
+          duracionValidada,
           cita.hora,
           cita.duracion_minutos
         )
@@ -207,7 +345,7 @@ export default function AgendarPage() {
     const finIntervalo = agregarMinutosAFechaHora(
       fecha,
       horaDisponible,
-      duracionSeleccionada
+      duracionValidada
     );
     const seCruzaConBloqueo = bloqueosAgenda.some((bloqueo) =>
       intervalosFechaHoraSeCruzan(
