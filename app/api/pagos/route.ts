@@ -5,13 +5,20 @@ import type { ResultSetHeader, RowDataPacket } from "mysql2";
 import pool from "./../../lib/db";
 import { verificarSesion } from "./../../lib/auth";
 import { obtenerAppUrl } from "./../../lib/app-url";
-import { horariosSeCruzan } from "./../../lib/horarios";
+import {
+  agregarDiasAFecha,
+  citaOcupaFecha,
+  esDuracionEnDias,
+  horariosSeCruzan,
+  obtenerFechasHabiles,
+} from "./../../lib/horarios";
 import {
   ipDelCliente,
   permitirIntento,
 } from "./../../lib/rate-limit";
 
 type CitaOcupada = RowDataPacket & {
+  fecha: string;
   hora: string;
   duracion_minutos: number;
 };
@@ -244,6 +251,18 @@ export async function POST(request: Request) {
     }
 
     const servicio = servicios[0];
+    const duracionServicio = Number(servicio.duracion_minutos) || 60;
+    const servicioPorDias = esDuracionEnDias(duracionServicio);
+    const fechasServicio = servicioPorDias
+      ? obtenerFechasHabiles(fecha, duracionServicio / 1440)
+      : [fecha];
+
+    if (servicioPorDias && fechasServicio[0] !== fecha) {
+      return NextResponse.json(
+        { error: "Los servicios por días deben iniciar en un día hábil." },
+        { status: 409 }
+      );
+    }
 
     if (servicio.tipo_servicio === "ESPECIAL") {
       return NextResponse.json(
@@ -277,26 +296,58 @@ export async function POST(request: Request) {
     // VALIDAR HORARIO
     // ====================================================
 
+    const ultimaFechaServicio = fechasServicio[fechasServicio.length - 1];
     const [citasExistentes] =
       await conexion.query<CitaOcupada[]>(
         `
-        SELECT c.hora, s.duracion_minutos
+        SELECT DATE_FORMAT(c.fecha, '%Y-%m-%d') AS fecha,
+          TIME_FORMAT(c.hora, '%H:%i') AS hora, s.duracion_minutos
         FROM citas c
         INNER JOIN servicios s ON c.servicio_id = s.id
-        WHERE c.fecha = ?
+        WHERE c.fecha >= DATE_SUB(?, INTERVAL 365 DAY)
+          AND c.fecha <= ?
           AND c.estado IN ('PENDIENTE', 'CONFIRMADA')
         `,
-        [fecha]
+        [fecha, ultimaFechaServicio]
       );
 
-    const hayCruce = citasExistentes.some((cita) =>
-      horariosSeCruzan(
-        hora,
-        Number(servicio.duracion_minutos),
-        String(cita.hora),
-        Number(cita.duracion_minutos)
-      )
-    );
+    const reservaDeDiaCompletoOcupada = servicioPorDias
+      ? fechasServicio.some((fechaServicio) =>
+          citasExistentes.some((cita) =>
+            citaOcupaFecha(
+              {
+                fecha: String(cita.fecha),
+                duracion_minutos: Number(cita.duracion_minutos),
+              },
+              fechaServicio
+            )
+          )
+        )
+      : citasExistentes.some(
+          (cita) =>
+            citaOcupaFecha(
+              {
+                fecha: String(cita.fecha),
+                duracion_minutos: Number(cita.duracion_minutos),
+              },
+              fecha
+            ) &&
+            (String(cita.fecha) !== fecha ||
+              esDuracionEnDias(Number(cita.duracion_minutos)))
+        );
+    const duracionParaCruce = servicioPorDias ? 60 : duracionServicio;
+    const hayCruce =
+      reservaDeDiaCompletoOcupada ||
+      citasExistentes.some(
+        (cita) =>
+          String(cita.fecha) === fecha &&
+          horariosSeCruzan(
+            hora,
+            duracionParaCruce,
+            String(cita.hora),
+            Number(cita.duracion_minutos)
+          )
+      );
 
     if (hayCruce) {
       return NextResponse.json(
@@ -308,25 +359,48 @@ export async function POST(request: Request) {
       );
     }
 
-    const [bloqueos] = await conexion.query<RowDataPacket[]>(
-      `
-      SELECT id
-      FROM bloqueos_agenda
-      WHERE activo = 1
-        AND inicio < DATE_ADD(CONCAT(?, ' ', ?, ':00'), INTERVAL ? MINUTE)
-        AND fin > CONCAT(?, ' ', ?, ':00')
-      LIMIT 1
-      `,
-      [
-        fecha,
-        hora,
-        Number(servicio.duracion_minutos),
-        fecha,
-        hora,
-      ]
-    );
+    const [bloqueos] = servicioPorDias
+      ? await conexion.query<RowDataPacket[]>(
+          `
+          SELECT DATE_FORMAT(inicio, '%Y-%m-%dT%H:%i') AS inicio,
+            DATE_FORMAT(fin, '%Y-%m-%dT%H:%i') AS fin
+          FROM bloqueos_agenda
+          WHERE activo = 1
+            AND inicio < DATE_ADD(?, INTERVAL 1 DAY)
+            AND fin > ?
+          `,
+          [ultimaFechaServicio, fecha]
+        )
+      : await conexion.query<RowDataPacket[]>(
+          `
+          SELECT id
+          FROM bloqueos_agenda
+          WHERE activo = 1
+            AND inicio < DATE_ADD(CONCAT(?, ' ', ?, ':00'), INTERVAL ? MINUTE)
+            AND fin > CONCAT(?, ' ', ?, ':00')
+          LIMIT 1
+          `,
+          [
+            fecha,
+            hora,
+            duracionParaCruce,
+            fecha,
+            hora,
+          ]
+        );
 
-    if (bloqueos.length > 0) {
+    const hayBloqueo = servicioPorDias
+      ? fechasServicio.some((fechaServicio) => {
+          const finDelDia = agregarDiasAFecha(fechaServicio, 1);
+
+          return bloqueos.some((bloqueo) =>
+            String(bloqueo.inicio) < `${finDelDia}T00:00` &&
+            String(bloqueo.fin) > `${fechaServicio}T00:00`
+          );
+        })
+      : bloqueos.length > 0;
+
+    if (hayBloqueo) {
       return NextResponse.json(
         { error: "El horario seleccionado está dentro de un bloqueo de agenda." },
         { status: 409 }

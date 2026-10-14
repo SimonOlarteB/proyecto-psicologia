@@ -3,6 +3,8 @@ import type { RowDataPacket } from "mysql2";
 import pool from "../../../lib/db";
 import {
   agregarMinutosAFechaHora,
+  citaOcupaFecha,
+  esDuracionEnDias,
   intervalosFechaHoraSeCruzan,
   horariosSeCruzan,
   minutosDesdeHora,
@@ -86,7 +88,7 @@ export async function GET(request: Request) {
         FROM disponibilidad_especial
         WHERE activo = 1
           AND fecha > ?
-          AND fecha <= DATE_ADD(?, INTERVAL 365 DAY)
+          AND fecha <= DATE_ADD(?, INTERVAL 730 DAY)
         ORDER BY fecha, hora_inicio
         `,
         [desde, desde]
@@ -98,8 +100,8 @@ export async function GET(request: Request) {
           s.duracion_minutos
         FROM citas c
         INNER JOIN servicios s ON c.servicio_id = s.id
-        WHERE c.fecha > ?
-          AND c.fecha <= DATE_ADD(?, INTERVAL 365 DAY)
+        WHERE c.fecha >= DATE_SUB(?, INTERVAL 365 DAY)
+          AND c.fecha <= DATE_ADD(?, INTERVAL 730 DAY)
           AND c.estado IN ('PENDIENTE', 'CONFIRMADA')
         ORDER BY c.fecha, c.hora
         `,
@@ -111,7 +113,7 @@ export async function GET(request: Request) {
           DATE_FORMAT(fin, '%Y-%m-%dT%H:%i') AS fin
         FROM bloqueos_agenda
         WHERE activo = 1
-          AND inicio < DATE_ADD(CONCAT(?, ' 00:00:00'), INTERVAL 366 DAY)
+          AND inicio < DATE_ADD(CONCAT(?, ' 00:00:00'), INTERVAL 731 DAY)
           AND fin > CONCAT(?, ' 00:00:00')
         ORDER BY inicio
         `,
@@ -124,14 +126,21 @@ export async function GET(request: Request) {
     const citasExistentes = citas[0];
     const bloqueosActivos = bloqueos[0];
     const duracion = Number(servicios[0].duracion_minutos) || 60;
-    const esDuracionEnDias = duracion >= 1440 && duracion % 1440 === 0;
-    const duracionValidada = esDuracionEnDias ? 60 : duracion;
+    const servicioPorDias = esDuracionEnDias(duracion);
+    const duracionValidada = servicioPorDias ? 60 : duracion;
     const fechaBase = new Date(`${desde}T12:00:00Z`);
 
     for (let desplazamiento = 1; desplazamiento <= 365; desplazamiento += 1) {
       const fechaCandidata = new Date(fechaBase);
       fechaCandidata.setUTCDate(fechaBase.getUTCDate() + desplazamiento);
       const fecha = fechaCandidata.toISOString().slice(0, 10);
+      if (
+        servicioPorDias &&
+        obtenerFechasHabiles(fecha, 1)[0] !== fecha
+      ) {
+        continue;
+      }
+
       const especial = fechasEspeciales.find((item) => item.fecha === fecha);
       const horarios = especial
         ? especial.hora_inicio && especial.hora_fin
@@ -152,7 +161,7 @@ export async function GET(request: Request) {
             continue;
           }
 
-          const fechasServicio = esDuracionEnDias
+          const fechasServicio = servicioPorDias
             ? obtenerFechasHabiles(fecha, duracion / 1440)
             : [fecha];
           const diasDisponibles = fechasServicio.every((fechaServicio) => {
@@ -169,20 +178,38 @@ export async function GET(request: Request) {
                     Number(item.dia_semana) === fechaTrabajo.getUTCDay()
                 );
 
-            const horarioDisponible = horariosTrabajo.find(
+            const horarioDisponible = horariosTrabajo.some(
               (item) =>
                 item.hora_inicio &&
                 item.hora_fin &&
-                minutosDesdeHora(hora) + duracionValidada <=
-                  minutosDesdeHora(item.hora_fin) &&
-                minutosDesdeHora(hora) >= minutosDesdeHora(item.hora_inicio)
+                (fechaServicio !== fecha ||
+                  (minutosDesdeHora(hora) + duracionValidada <=
+                    minutosDesdeHora(item.hora_fin) &&
+                    minutosDesdeHora(hora) >=
+                      minutosDesdeHora(item.hora_inicio)))
             );
 
             if (!horarioDisponible) return false;
 
             const citasDelDia = citasExistentes.filter(
-              (cita) => cita.fecha === fechaServicio
+              (cita) =>
+                citaOcupaFecha(
+                  {
+                    fecha: cita.fecha,
+                    duracion_minutos: Number(cita.duracion_minutos),
+                  },
+                  fechaServicio
+                )
             );
+            const citaDiaCompleto = citasDelDia.some(
+              (cita) =>
+                cita.fecha !== fechaServicio ||
+                esDuracionEnDias(Number(cita.duracion_minutos))
+            );
+
+            if (servicioPorDias && citasDelDia.length > 0) return false;
+            if (!servicioPorDias && citaDiaCompleto) return false;
+
             const inicioCandidata = `${fechaServicio}T${hora}`;
             const finCandidata = agregarMinutosAFechaHora(
               fechaServicio,
@@ -199,8 +226,16 @@ export async function GET(request: Request) {
             );
             const cruzaBloqueo = bloqueosActivos.some((bloqueo) =>
               intervalosFechaHoraSeCruzan(
-                inicioCandidata,
-                finCandidata,
+                servicioPorDias
+                  ? `${fechaServicio}T00:00`
+                  : inicioCandidata,
+                servicioPorDias
+                  ? agregarMinutosAFechaHora(
+                      fechaServicio,
+                      "00:00",
+                      1440
+                    )
+                  : finCandidata,
                 bloqueo.inicio,
                 bloqueo.fin
               )

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { formatearDuracion } from "../lib/duracion";
 import {
   agregarMinutosAFechaHora,
+  esDuracionEnDias,
   intervalosFechaHoraSeCruzan,
   horariosSeCruzan,
   minutosDesdeHora,
@@ -182,8 +183,7 @@ export default function AgendarPage() {
       String(servicio.id) === servicioSeleccionado
   );
   const duracionServicio = Number(servicioActual?.duracion_minutos) || 60;
-  const esServicioPorDias =
-    duracionServicio >= 1440 && duracionServicio % 1440 === 0;
+  const esServicioPorDias = esDuracionEnDias(duracionServicio);
   const diasServicio = esServicioPorDias
     ? duracionServicio / 1440
     : 0;
@@ -275,6 +275,13 @@ export default function AgendarPage() {
 
     if (esServicioPorDias && fecha) {
       const fechasServicio = obtenerFechasHabiles(fecha, diasServicio);
+      if (fechasServicio[0] !== fecha) {
+        return {
+          disponible: false,
+          excedeDisponibilidad: true,
+        };
+      }
+
       const ocupaciones =
         ocupacionServicio?.clave === claveOcupacionServicio
           ? ocupacionServicio.porFecha
@@ -285,46 +292,33 @@ export default function AgendarPage() {
         const disponibilidadEspecial = disponibilidadesEspeciales.find(
           (item) => item.fecha?.slice(0, 10) === fechaServicio
         );
-        const horario = disponibilidadEspecial
+        const horariosDia = disponibilidadEspecial
           ? disponibilidadEspecial.hora_inicio && disponibilidadEspecial.hora_fin
-            ? disponibilidadEspecial
-            : null
-          : disponibilidad.find((item) => Number(item.dia_semana) === diaSemana);
+            ? [disponibilidadEspecial]
+            : []
+          : disponibilidad.filter(
+              (item) => Number(item.dia_semana) === diaSemana
+            );
+        const horarioInicioDisponible = horariosDia.some(
+          (horario) =>
+            horario.hora_inicio &&
+            horario.hora_fin &&
+            inicioDisponible >= minutosDesdeHora(horario.hora_inicio) &&
+            inicioDisponible + 60 <= minutosDesdeHora(horario.hora_fin)
+        );
+        const ocupacion = ocupaciones?.[fechaServicio];
 
         if (
-          !horario?.hora_inicio ||
-          !horario.hora_fin ||
-          inicioDisponible < minutosDesdeHora(horario.hora_inicio) ||
-          inicioDisponible + 60 > minutosDesdeHora(horario.hora_fin) ||
-          !ocupaciones?.[fechaServicio]
+          horariosDia.length === 0 ||
+          (fechaServicio === fecha && !horarioInicioDisponible) ||
+          !ocupacion ||
+          ocupacion.citas.length > 0 ||
+          ocupacion.bloqueos.length > 0
         ) {
           return true;
         }
 
-        const ocupacion = ocupaciones[fechaServicio];
-        const hayCita = ocupacion.citas.some((cita) =>
-          horariosSeCruzan(
-            horaDisponible,
-            60,
-            cita.hora,
-            cita.duracion_minutos
-          )
-        );
-        const finDiaServicio = agregarMinutosAFechaHora(
-          fechaServicio,
-          horaDisponible,
-          60
-        );
-        const hayBloqueo = ocupacion.bloqueos.some((bloqueo) =>
-          intervalosFechaHoraSeCruzan(
-            `${fechaServicio}T${horaDisponible}`,
-            finDiaServicio,
-            bloqueo.inicio,
-            bloqueo.fin
-          )
-        );
-
-        return hayCita || hayBloqueo;
+        return false;
       });
     }
 
@@ -1030,11 +1024,13 @@ export default function AgendarPage() {
                           No hay horarios disponibles este día. Selecciona un servicio para buscar el próximo espacio según su duración.
                         </p>
                       ) : resultadoProximaDisponibilidad?.desde !== fecha ? (
-                        <p>Buscando el próximo horario disponible...</p>
+                        <p>Buscando la próxima fecha disponible...</p>
                       ) : resultadoProximaDisponibilidad.proxima ? (
                         <div className="flex flex-col gap-3">
                           <p>
-                            No hay horarios disponibles este día. El próximo es el{" "}
+                            {esServicioPorDias
+                              ? "No hay disponibilidad para todos los días hábiles de este servicio. La próxima fecha disponible es el "
+                              : "No hay horarios disponibles este día. El próximo es el "}
                             <strong>
                               {new Date(`${resultadoProximaDisponibilidad.proxima.fecha}T12:00:00`).toLocaleDateString("es-CO", {
                                 weekday: "long",
