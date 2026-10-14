@@ -739,11 +739,6 @@ export default async function Home({
                 {profesion}
               </p>
 
-              <div className="mt-5 h-px w-10 bg-[#E8A67F]" />
-
-              <p className="mt-5 max-w-sm text-sm leading-6 text-white/65">
-                {descripcion}
-              </p>
             </div>
 
 
