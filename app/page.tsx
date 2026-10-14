@@ -12,7 +12,14 @@ import {
 
 export const dynamic = "force-dynamic";
 
-export default async function Home() {
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<{ pago?: string }>;
+}) {
+  const mostrarConfirmacionPago =
+    (await searchParams).pago === "aprobado";
+
   let servicios: Awaited<ReturnType<typeof obtenerServiciosPublicos>> = [];
   let perfil: Awaited<ReturnType<typeof obtenerPerfilPublico>> | null = null;
   let trayectoria: Awaited<ReturnType<typeof obtenerTrayectoriaPublica>> = [];
@@ -84,6 +91,27 @@ export default async function Home() {
 
   return (
     <main className="min-h-screen overflow-hidden bg-[#F7F1E9] text-[#20231F]">
+      {mostrarConfirmacionPago && (
+        <div
+          role="status"
+          className="border-b border-[#C8D0BC] bg-[#E8E9DF] px-5 py-5 text-[#3F4635] sm:px-8"
+        >
+          <div className="mx-auto flex max-w-7xl items-start gap-3">
+            <span
+              aria-hidden="true"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#59614D] text-sm text-white"
+            >
+              ✓
+            </span>
+            <div>
+              <p className="font-medium">Cita confirmada</p>
+              <p className="mt-1 text-sm leading-6 text-[#62675B]">
+                El pago fue aprobado. En breve recibirás en el correo electrónico registrado la información de tu cita. Si no encuentras el mensaje, revisa la carpeta de correo no deseado.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
       <ScrollToTop />
 
       {/* NAVBAR */}

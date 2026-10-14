@@ -4,6 +4,7 @@ import crypto from "crypto";
 import type { ResultSetHeader, RowDataPacket } from "mysql2";
 import pool from "./../../lib/db";
 import { verificarSesion } from "./../../lib/auth";
+import { obtenerAppUrl } from "./../../lib/app-url";
 import { horariosSeCruzan } from "./../../lib/horarios";
 import {
   ipDelCliente,
@@ -545,6 +546,8 @@ export async function POST(request: Request) {
           firmaIntegridad,
         "expiration-time":
           expirationTime,
+        "redirect-url":
+          `${obtenerAppUrl()}/pago/resultado`,
       });
 
     const checkoutUrl =
