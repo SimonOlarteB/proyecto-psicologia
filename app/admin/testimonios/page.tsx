@@ -2,6 +2,9 @@
 
 import { useEffect, useState } from "react";
 import AdminNav from "../../components/AdminNav";
+import RichText from "../../components/RichText";
+import RichTextEditor from "../../components/admin/RichTextEditor";
+import { hasRichTextContent } from "../../lib/rich-text";
 
 type Testimonio = {
     id: number;
@@ -110,7 +113,7 @@ const respuesta = await fetch(
             return;
         }
 
-        if (!formulario.comentario.trim()) {
+        if (!hasRichTextContent(formulario.comentario)) {
             setAlerta({
                 tipo: "error",
                 titulo: "Falta información",
@@ -459,13 +462,14 @@ const respuesta = await fetch(
 
                                                             </div>
 
-                                                            <p className="mt-3 text-sm leading-7 text-[#707469]">
+                                                            <div className="mt-3 text-sm leading-7 text-[#707469]">
                                                                 “
-                                                                {
-                                                                    testimonio.comentario
-                                                                }
+                                                                <RichText
+                                                                    value={testimonio.comentario}
+                                                                    className="inline"
+                                                                />
                                                                 ”
-                                                            </p>
+                                                            </div>
 
                                                         </div>
 
@@ -619,22 +623,19 @@ const respuesta = await fetch(
                                         Comentario
                                     </label>
 
-                                    <textarea
-                                        rows={6}
+                                    <RichTextEditor
                                         value={
                                             formulario.comentario
                                         }
-                                        onChange={(e) =>
+                                        onChange={(comentario) =>
                                             setFormulario({
                                                 ...formulario,
-                                                comentario:
-                                                    e
-                                                        .target
-                                                        .value,
+                                                comentario,
                                             })
                                         }
+                                        label="Comentario del testimonio"
                                         placeholder="Escribe el testimonio..."
-                                        className="w-full resize-y rounded-2xl border border-[#D8D0C5] bg-white px-4 py-3 text-sm leading-6 outline-none transition focus:border-[#C56835] focus:ring-2 focus:ring-[#C56835]/10"
+                                        minHeight="9rem"
                                     />
 
                                 </div>

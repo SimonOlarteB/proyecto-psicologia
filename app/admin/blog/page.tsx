@@ -3,6 +3,9 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import AdminNav from "../../components/AdminNav";
+import RichText from "../../components/RichText";
+import RichTextEditor from "../../components/admin/RichTextEditor";
+import { hasRichTextContent } from "../../lib/rich-text";
 
 type EstadoPublicacion = "BORRADOR" | "PUBLICADO";
 
@@ -260,7 +263,7 @@ export default function BlogAdmin() {
       return;
     }
 
-    if (!formulario.contenido.trim()) {
+    if (!hasRichTextContent(formulario.contenido)) {
       mostrarMensaje(
         "El contenido es obligatorio.",
         "error"
@@ -295,7 +298,9 @@ export default function BlogAdmin() {
 
       const datos = {
         titulo: formulario.titulo.trim(),
-        resumen: formulario.resumen.trim() || null,
+        resumen: hasRichTextContent(formulario.resumen)
+          ? formulario.resumen.trim()
+          : null,
         contenido: formulario.contenido.trim(),
         imagen_url: imagenUrl,
         estado: formulario.estado,
@@ -661,17 +666,14 @@ export default function BlogAdmin() {
                       Resumen
                     </label>
 
-                    <textarea
+                    <RichTextEditor
                       value={formulario.resumen}
-                      onChange={(e) =>
-                        cambiarCampo(
-                          "resumen",
-                          e.target.value
-                        )
+                      onChange={(resumen) =>
+                        cambiarCampo("resumen", resumen)
                       }
-                      rows={3}
+                      label="Resumen del artículo"
                       placeholder="Escribe una breve descripción del artículo..."
-                      className="w-full resize-none rounded-2xl border border-[#D8D2C9] bg-[#FDFCFA] px-4 py-3.5 text-sm leading-6 text-[#59614D] outline-none transition placeholder:text-[#59614D]/40 focus:border-[#C56835] focus:ring-2 focus:ring-[#C56835]/10"
+                      minHeight="6rem"
                     />
                   </div>
 
@@ -802,22 +804,18 @@ export default function BlogAdmin() {
                       Contenido *
                     </label>
 
-                    <textarea
+                    <RichTextEditor
                       value={formulario.contenido}
-                      onChange={(e) =>
-                        cambiarCampo(
-                          "contenido",
-                          e.target.value
-                        )
+                      onChange={(contenido) =>
+                        cambiarCampo("contenido", contenido)
                       }
-                      rows={12}
+                      label="Contenido del artículo"
                       placeholder="Escribe aquí el contenido completo del artículo..."
-                      className="w-full resize-y rounded-2xl border border-[#D8D2C9] bg-[#FDFCFA] px-4 py-3.5 text-sm leading-7 text-[#59614D] outline-none transition placeholder:text-[#59614D]/40 focus:border-[#C56835] focus:ring-2 focus:ring-[#C56835]/10"
+                      minHeight="20rem"
                     />
 
                     <p className="mt-2 text-xs text-[#59614D]/50">
-                      Puedes utilizar varios párrafos. Más adelante
-                      podemos agregar un editor de texto enriquecido.
+                      Usa la barra para cambiar el formato del texto.
                     </p>
                   </div>
                 </div>
@@ -1014,9 +1012,10 @@ export default function BlogAdmin() {
                           </h2>
 
                           {publicacion.resumen && (
-                            <p className="mt-3 line-clamp-3 text-sm leading-6 text-[#59614D]/65">
-                              {publicacion.resumen}
-                            </p>
+                            <RichText
+                              value={publicacion.resumen}
+                              className="mt-3 line-clamp-3 text-sm leading-6 text-[#59614D]/65"
+                            />
                           )}
 
                           <div className="mt-4 text-xs text-[#59614D]/40">

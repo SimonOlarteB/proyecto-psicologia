@@ -3,7 +3,7 @@
 Aplicación de [Next.js](https://nextjs.org) 16 (App Router, React 19) para la práctica de psicología: agenda de citas con pagos Wompi, Google Calendar / Google Meet, correos con Resend, recordatorios automáticos y panel de administración.
 
 - **Runtime:** Node.js 20+ (no es compatible con Edge por `mysql2`, `googleapis` y `fs`).
-- **Base de datos:** MySQL 8 con `utf8mb4` (esquema en `schema/001_init.sql`).
+- **Base de datos:** MySQL 8 con `utf8mb4` (esquema en `schema/001_init.sql`; migraciones posteriores en `schema/`).
 - **Zona horaria de negocio:** `America/Bogota`.
 
 ## Desarrollo
@@ -19,6 +19,12 @@ Abrir http://localhost:3000. El esquema de la base se crea con:
 ```bash
 mysql -u root -p < schema/001_init.sql
 node scripts/crear-admin.mjs
+```
+
+Si la base de datos ya existía antes de agregar las categorías de servicios, aplica una sola vez la migración:
+
+```bash
+mysql -u root -p psicologia < schema/002_categoria_servicios.sql
 ```
 
 ## Variables de entorno
@@ -46,7 +52,7 @@ Vercel solo si se cambia la arquitectura: el filesystem efímero rompe los uploa
 
 ### Pasos
 
-1. **Base de datos** en el host: `mysql < schema/001_init.sql` con el usuario de aplicación.
+1. **Base de datos** en el host: ejecuta `schema/001_init.sql` en una base nueva. En bases existentes, aplica cada migración pendiente de `schema/` (incluida `002_categoria_servicios.sql`) una sola vez, con el usuario de aplicación.
 2. **Secretos** del paso anterior en el panel del proveedor (nunca en el repo).
 3. **Construir y arrancar:**
 

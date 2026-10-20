@@ -3,12 +3,16 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { formatearDuracion } from "../../lib/duracion";
+import RichText from "../../components/RichText";
+import RichTextEditor from "../../components/admin/RichTextEditor";
+import { hasRichTextContent } from "../../lib/rich-text";
 
 type Servicio = {
   id: number;
   nombre: string;
   descripcion: string | null;
   tipo_servicio: "NORMAL" | "ESPECIAL";
+  categoria: "PERSONAS" | "EMPRESAS";
   precio: number;
   duracion_minutos: number;
 modalidad: "PRESENCIAL" | "VIRTUAL" | "AMBAS";
@@ -19,6 +23,7 @@ type FormularioServicio = {
   nombre: string;
   descripcion: string;
   tipo_servicio: "NORMAL" | "ESPECIAL";
+  categoria: "PERSONAS" | "EMPRESAS";
   precio: string;
   duracion_minutos: string;
   unidad_duracion: "MINUTOS" | "HORAS" | "HORAS_MINUTOS" | "DIAS";
@@ -31,6 +36,7 @@ const formularioInicial: FormularioServicio = {
   nombre: "",
   descripcion: "",
   tipo_servicio: "NORMAL",
+  categoria: "PERSONAS",
   precio: "",
   duracion_minutos: "",
   unidad_duracion: "MINUTOS",
@@ -112,6 +118,7 @@ export default function ServiciosAdminPage() {
       nombre: servicio.nombre,
       descripcion: servicio.descripcion || "",
       tipo_servicio: servicio.tipo_servicio || "NORMAL",
+      categoria: servicio.categoria || "PERSONAS",
       precio: String(servicio.precio),
       duracion_minutos: String(cantidadDuracion),
       unidad_duracion: unidadDuracion,
@@ -195,7 +202,7 @@ export default function ServiciosAdminPage() {
     const esEspecial =
       formulario.tipo_servicio === "ESPECIAL";
 
-    if (esEspecial && !formulario.descripcion.trim()) {
+    if (esEspecial && !hasRichTextContent(formulario.descripcion)) {
       setError("La descripción del servicio es obligatoria.");
       return;
     }
@@ -260,6 +267,7 @@ export default function ServiciosAdminPage() {
             nombre: formulario.nombre,
             descripcion: formulario.descripcion,
             tipo_servicio: formulario.tipo_servicio,
+            categoria: formulario.categoria,
             precio: esEspecial ? 0 : Number(formulario.precio),
             duracion_minutos: duracionEnMinutos,
             modalidad: formulario.modalidad,
@@ -269,6 +277,7 @@ export default function ServiciosAdminPage() {
             nombre: formulario.nombre,
             descripcion: formulario.descripcion,
             tipo_servicio: formulario.tipo_servicio,
+            categoria: formulario.categoria,
             precio: esEspecial ? 0 : Number(formulario.precio),
             duracion_minutos: duracionEnMinutos,
             modalidad: formulario.modalidad,
@@ -458,6 +467,12 @@ export default function ServiciosAdminPage() {
                         {servicio.nombre}
                       </h2>
 
+                      <span className="mt-2 inline-flex rounded-full bg-[#E8E9DF] px-3 py-1 text-xs font-medium text-[#59614D]">
+                        {servicio.categoria === "EMPRESAS"
+                          ? "Empresas"
+                          : "Personas"}
+                      </span>
+
                       {servicio.tipo_servicio === "ESPECIAL" && (
                         <span className="mt-2 inline-flex rounded-full bg-[#FCE8DC] px-3 py-1 text-xs font-medium text-[#A94F24]">
                           Cotizar por WhatsApp
@@ -480,10 +495,16 @@ export default function ServiciosAdminPage() {
                     </span>
                   </div>
 
-                  <p className="min-h-[48px] text-sm leading-6 text-[#59614D]/70">
-                    {servicio.descripcion ||
-                      "Sin descripción registrada."}
-                  </p>
+                  {servicio.descripcion ? (
+                    <RichText
+                      value={servicio.descripcion}
+                      className="min-h-[48px] text-sm leading-6 text-[#59614D]/70"
+                    />
+                  ) : (
+                    <p className="min-h-[48px] text-sm leading-6 text-[#59614D]/70">
+                      Sin descripción registrada.
+                    </p>
+                  )}
 
                   {servicio.tipo_servicio !== "ESPECIAL" && (
                     <div className="mt-5 grid grid-cols-2 gap-3">
@@ -577,6 +598,26 @@ export default function ServiciosAdminPage() {
 
               <div>
                 <label className="mb-2 block text-sm font-medium text-[#59614D]">
+                  Dirigido a
+                </label>
+
+                <select
+                  value={formulario.categoria}
+                  onChange={(e) =>
+                    actualizarCampo(
+                      "categoria",
+                      e.target.value as FormularioServicio["categoria"]
+                    )
+                  }
+                  className="w-full rounded-xl border border-[#59614D]/20 bg-white px-4 py-3 text-sm outline-none transition focus:border-[#C56835] focus:ring-2 focus:ring-[#C56835]/10"
+                >
+                  <option value="PERSONAS">Personas</option>
+                  <option value="EMPRESAS">Empresas</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-[#59614D]">
                   Tipo de servicio
                 </label>
 
@@ -620,18 +661,18 @@ export default function ServiciosAdminPage() {
                   Descripción
                 </label>
 
-                <textarea
+                <RichTextEditor
                   value={formulario.descripcion}
                   required={formulario.tipo_servicio === "ESPECIAL"}
-                  onChange={(e) =>
+                  onChange={(descripcion) =>
                     actualizarCampo(
                       "descripcion",
-                      e.target.value
+                      descripcion
                     )
                   }
+                  label="Descripción del servicio"
                   placeholder="Describe brevemente el servicio..."
-                  rows={4}
-                  className="w-full resize-none rounded-xl border border-[#59614D]/20 px-4 py-3 text-sm outline-none transition focus:border-[#C56835] focus:ring-2 focus:ring-[#C56835]/10"
+                  minHeight="7rem"
                 />
               </div>
 

@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { use, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { formatearDuracion } from "../lib/duracion";
+import RichText from "../components/RichText";
 import {
   agregarMinutosAFechaHora,
   esDuracionEnDias,
@@ -64,9 +65,16 @@ type CitaCreada = {
   monto: number;
 };
 
-export default function AgendarPage() {
+export default function AgendarPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ servicio_id?: string }>;
+}) {
+  const { servicio_id: servicioInicialId } = use(searchParams);
   const [servicios, setServicios] = useState<Servicio[]>([]);
-  const [servicioSeleccionado, setServicioSeleccionado] = useState("");
+  const [servicioSeleccionado, setServicioSeleccionado] = useState(
+    servicioInicialId || ""
+  );
   const [modalidad, setModalidad] = useState("");
   const [fecha, setFecha] = useState("");
   const [hora, setHora] = useState("");
@@ -899,9 +907,12 @@ export default function AgendarPage() {
                     {servicioActual.nombre}
                   </h2>
 
-                  <p className="mt-2 text-sm text-[#707469]">
-                    {servicioActual.descripcion}
-                  </p>
+                  <div className="mt-2 text-sm text-[#707469]">
+                    <RichText
+                      value={servicioActual.descripcion}
+                      className="leading-6"
+                    />
+                  </div>
 
                   <div className="mt-3 flex flex-wrap gap-4 text-sm text-[#707469]">
                     <span>

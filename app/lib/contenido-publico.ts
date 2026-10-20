@@ -13,6 +13,20 @@ export interface PublicacionPublica extends RowDataPacket {
   actualizado_en: string;
 }
 
+export type CategoriaServicio = "PERSONAS" | "EMPRESAS";
+
+export interface ServicioPublico extends RowDataPacket {
+  id: number;
+  nombre: string;
+  descripcion: string | null;
+  tipo_servicio: "NORMAL" | "ESPECIAL";
+  categoria: CategoriaServicio;
+  precio: number;
+  duracion_minutos: number;
+  modalidad: "PRESENCIAL" | "VIRTUAL" | "AMBAS";
+  activo: number;
+}
+
 export async function obtenerPerfilPublico() {
   const [filas] = await pool.query<RowDataPacket[]>(`
     SELECT
@@ -34,13 +48,17 @@ export async function obtenerPerfilPublico() {
   return filas[0] || null;
 }
 
-export async function obtenerServiciosPublicos() {
-  const [filas] = await pool.query<RowDataPacket[]>(`
+export async function obtenerServiciosPublicos(
+  categoria?: CategoriaServicio
+): Promise<ServicioPublico[]> {
+  const [filas] = await pool.query<ServicioPublico[]>(
+    `
     SELECT
       id,
       nombre,
       descripcion,
       tipo_servicio,
+      categoria,
       precio,
       duracion_minutos,
       modalidad,
@@ -49,10 +67,36 @@ export async function obtenerServiciosPublicos() {
       actualizado_en
     FROM servicios
     WHERE activo = 1
+      AND (? IS NULL OR categoria = ?)
     ORDER BY id DESC
-  `);
+    `,
+    [categoria ?? null, categoria ?? null]
+  );
 
   return filas;
+}
+
+export async function obtenerServicioPublico(id: number) {
+  const [filas] = await pool.query<ServicioPublico[]>(
+    `
+    SELECT
+      id,
+      nombre,
+      descripcion,
+      tipo_servicio,
+      categoria,
+      precio,
+      duracion_minutos,
+      modalidad,
+      activo
+    FROM servicios
+    WHERE id = ? AND activo = 1
+    LIMIT 1
+    `,
+    [id]
+  );
+
+  return filas[0] ?? null;
 }
 
 export async function obtenerTrayectoriaPublica() {

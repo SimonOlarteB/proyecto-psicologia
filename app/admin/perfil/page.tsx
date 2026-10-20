@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import AdminNav from "../../components/AdminNav";
+import RichText from "../../components/RichText";
+import RichTextEditor from "../../components/admin/RichTextEditor";
 
 type Perfil = {
     id?: number;
@@ -536,18 +538,17 @@ export default function PerfilAdminPage() {
                                             Descripción profesional
                                         </label>
 
-                                        <textarea
-                                            rows={6}
+                                        <RichTextEditor
                                             value={perfil.descripcion}
-                                            onChange={(e) =>
+                                            onChange={(descripcion) =>
                                                 setPerfil({
                                                     ...perfil,
-                                                    descripcion:
-                                                        e.target.value,
+                                                    descripcion,
                                                 })
                                             }
+                                            label="Descripción profesional"
                                             placeholder="Escribe una descripción profesional..."
-                                            className="w-full resize-y rounded-2xl border border-[#D8D0C5] bg-[#FCFAF7] px-4 py-3 text-sm outline-none transition focus:border-[#C56835] focus:ring-2 focus:ring-[#C56835]/10"
+                                            minHeight="9rem"
                                         />
                                     </div>
 
@@ -1069,11 +1070,10 @@ export default function PerfilAdminPage() {
                                                         )}
 
                                                         {elemento.descripcion && (
-                                                            <p className="mt-3 text-sm leading-6 text-[#707469]">
-                                                                {
-                                                                    elemento.descripcion
-                                                                }
-                                                            </p>
+                                                            <RichText
+                                                                value={elemento.descripcion}
+                                                                className="mt-3 text-sm leading-6 text-[#707469]"
+                                                            />
                                                         )}
 
                                                         {(elemento.fecha_inicio ||
@@ -1284,17 +1284,17 @@ export default function PerfilAdminPage() {
                                         Descripción
                                     </label>
 
-                                    <textarea
-                                        rows={4}
+                                    <RichTextEditor
                                         value={formTrayectoria.descripcion}
-                                        onChange={(e) =>
+                                        onChange={(descripcion) =>
                                             setFormTrayectoria({
                                                 ...formTrayectoria,
-                                                descripcion: e.target.value,
+                                                descripcion,
                                             })
                                         }
+                                        label="Descripción de trayectoria"
                                         placeholder="Descripción del estudio o certificación..."
-                                        className="w-full resize-y rounded-2xl border border-[#D8D0C5] bg-white px-4 py-3 text-sm outline-none focus:border-[#C56835]"
+                                        minHeight="7rem"
                                     />
                                 </div>
 

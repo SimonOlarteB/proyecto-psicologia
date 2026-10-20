@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import RichText from "../components/RichText";
+import { richTextToPlainText } from "../lib/rich-text";
 
 interface Publicacion {
   id: number;
@@ -74,8 +76,7 @@ export default function BlogPublico() {
       return resumen;
     }
 
-    const texto = contenido
-      .replace(/<[^>]*>/g, "")
+    const texto = richTextToPlainText(contenido)
       .replace(/\s+/g, " ")
       .trim();
 
@@ -243,12 +244,13 @@ export default function BlogPublico() {
                         {publicacion.titulo}
                       </h3>
 
-                      <p className="mt-3 line-clamp-3 text-sm leading-6 text-[#59614D]/65">
-                        {obtenerExtracto(
+                      <RichText
+                        value={obtenerExtracto(
                           publicacion.contenido,
                           publicacion.resumen
                         )}
-                      </p>
+                        className="mt-3 line-clamp-3 text-sm leading-6 text-[#59614D]/65"
+                      />
 
                      <Link
   href={`/blog/${publicacion.id}`}

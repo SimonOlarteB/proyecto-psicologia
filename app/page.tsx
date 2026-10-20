@@ -1,6 +1,7 @@
 import ScrollToTop from "./ScrollToTop";
 import Link from "next/link";
-import { formatearDuracion } from "./lib/duracion";
+import ServicioCard from "./components/ServicioCard";
+import RichText from "./components/RichText";
 import {
   obtenerPerfilPublico,
   obtenerPublicacionesPublicas,
@@ -9,6 +10,7 @@ import {
   obtenerTrayectoriaPublica,
   type PublicacionPublica,
 } from "./lib/contenido-publico";
+import { richTextToPlainText } from "./lib/rich-text";
 
 export const dynamic = "force-dynamic";
 
@@ -70,6 +72,12 @@ export default async function Home({
 
   const restoNombre =
     nombrePartes.slice(1).join(" ") || "Elisa Sánchez";
+  const serviciosPersonas = servicios
+    .filter((servicio) => servicio.categoria === "PERSONAS")
+    .slice(0, 4);
+  const serviciosEmpresas = servicios
+    .filter((servicio) => servicio.categoria === "EMPRESAS")
+    .slice(0, 4);
 
   // Aceptamos tanto URLs externas como rutas locales
   // generadas por el sistema de subida de imágenes.
@@ -209,9 +217,10 @@ export default async function Home({
               </span>
             </h1>
 
-            <p className="mt-8 max-w-lg text-base leading-7 text-[#62675B] md:text-lg md:leading-8">
-              {descripcion}
-            </p>
+            <RichText
+              value={descripcion}
+              className="mt-8 max-w-lg text-base leading-7 text-[#62675B] md:text-lg md:leading-8"
+            />
             <p className="mt-3 text-xs font-medium uppercase tracking-[0.18em] text-[#59614D]">
               {profesion} · {nombreProfesional}
             </p>
@@ -370,80 +379,57 @@ export default async function Home({
           </div>
 
 
-          {/* SERVICIOS DESDE MYSQL */}
-          <div className="mt-14 grid gap-6 md:grid-cols-2">
-
-            {servicios
-              .filter((servicio) => servicio.activo)
-              .map((servicio) => (
-
-                <div
-                  key={servicio.id}
-                  className="group rounded-2xl border border-[#E7E0D7] bg-[#FBF9F5] p-6 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-lg md:p-7"
-                >
-
-                  <h3 className="font-serif text-2xl text-[#3F4635]">
-                    {servicio.nombre}
-                  </h3>
-
-                  <p className="mt-3 text-[#707469]">
-                    {servicio.descripcion}
-                  </p>
-
-                  {servicio.tipo_servicio === "ESPECIAL" ? (
-                      <div className="mt-5 flex flex-col items-start gap-4">
-                      <span className="text-sm font-medium text-[#707469]">
-                        Atención personalizada · Cotización previa
-                      </span>
-
-                      {whatsappLink ? (
-                        <a
-                          href={`https://wa.me/${whatsappLink}?text=${encodeURIComponent(`Hola, quisiera cotizar el servicio ${servicio.nombre}.`)}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex w-fit items-center gap-2 rounded-full bg-[#C56835] px-6 py-3 text-sm font-medium text-white transition hover:bg-[#B5572A] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#C56835]"
-                        >
-                          Cotizar por WhatsApp
-                        </a>
-                      ) : (
-                        <p className="text-sm text-[#A94F24]">
-                          WhatsApp no está configurado actualmente.
-                        </p>
-                      )}
-                    </div>
-                  ) : (
-                    <>
-                      <div className="mt-5 flex flex-wrap gap-3 text-sm text-[#707469]">
-                        <span>
-                          ⏱️ {formatearDuracion(servicio.duracion_minutos)}
-                        </span>
-
-                        <span>
-                          💰 ${Number(servicio.precio).toLocaleString("es-CO")}
-                        </span>
-
-                        <span>
-                          {servicio.modalidad === "VIRTUAL"
-                            ? "💻 Virtual"
-                            : servicio.modalidad === "PRESENCIAL"
-                              ? "🏢 Presencial"
-                              : "🏢💻 Presencial y Virtual"}
-                        </span>
-                      </div>
-
-                      <a
-                        href="/agendar"
-                        className="mt-6 inline-block rounded-full bg-[#C56835] px-6 py-3 text-sm font-medium text-white transition hover:bg-[#B5572A] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#C56835]"
-                      >
-                        Agendar sesión
-                      </a>
-                    </>
-                  )}
-
+          <div className="mt-14 space-y-16">
+            {[
+              {
+                categoria: "personas",
+                titulo: "Para personas",
+                descripcion: "Acompañamiento profesional para tu bienestar y crecimiento personal.",
+                servicios: serviciosPersonas,
+                href: "/servicios/personas",
+              },
+              {
+                categoria: "empresas",
+                titulo: "Para empresas",
+                descripcion: "Servicios de bienestar, desarrollo y acompañamiento para organizaciones.",
+                servicios: serviciosEmpresas,
+                href: "/servicios/empresas",
+              },
+            ].map((grupo) => (
+              <div key={grupo.categoria}>
+                <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                  <div>
+                    <h3 className="font-serif text-3xl text-[#3F4635]">
+                      {grupo.titulo}
+                    </h3>
+                    <p className="mt-2 text-sm leading-6 text-[#707469]">
+                      {grupo.descripcion}
+                    </p>
+                  </div>
                 </div>
 
-              ))}
+                {grupo.servicios.length > 0 ? (
+                  <div className="grid gap-6 md:grid-cols-2">
+                    {grupo.servicios.map((servicio) => (
+                      <ServicioCard key={servicio.id} servicio={servicio} />
+                    ))}
+                  </div>
+                ) : (
+                  <p className="rounded-2xl border border-dashed border-[#D8D0C5] p-8 text-center text-sm text-[#707469]">
+                    Pronto encontrarás aquí los servicios para {grupo.categoria}.
+                  </p>
+                )}
 
+                <div className="mt-6 text-center">
+                  <Link
+                    href={grupo.href}
+                    className="inline-flex rounded-full border border-[#59614D] px-6 py-3 text-sm font-medium text-[#59614D] transition hover:bg-[#59614D] hover:text-white"
+                  >
+                    Ver servicios
+                  </Link>
+                </div>
+              </div>
+            ))}
           </div>
 
         </div>
@@ -489,7 +475,12 @@ export default async function Home({
                       <p className="text-xs font-medium uppercase tracking-[0.15em] text-[#B95B32]">{tipo}</p>
                       <h3 className="mt-2 font-serif text-xl leading-7">{elemento.titulo}</h3>
                       {elemento.institucion && <p className="mt-1 text-sm text-[#707469]">{elemento.institucion}</p>}
-                      {elemento.descripcion && <p className="mt-3 text-sm leading-6 text-[#62675B]">{elemento.descripcion}</p>}
+                      {elemento.descripcion && (
+                        <RichText
+                          value={elemento.descripcion}
+                          className="mt-3 text-sm leading-6 text-[#62675B]"
+                        />
+                      )}
                       {(elemento.fecha_inicio || elemento.fecha_fin) && (
                         <p className="mt-3 text-xs text-[#85877D]">
                           {elemento.fecha_inicio ? new Date(elemento.fecha_inicio).toLocaleDateString("es-CO", { month: "long", year: "numeric" }) : "Sin fecha"}
@@ -596,9 +587,14 @@ export default async function Home({
 
 
                   {/* COMENTARIO */}
-                  <p className="relative mt-5 text-base leading-7 text-[#62675B]">
-                    “{testimonio.comentario}”
-                  </p>
+                  <div className="relative mt-5 text-base leading-7 text-[#62675B]">
+                    “
+                    <RichText
+                      value={testimonio.comentario}
+                      className="inline"
+                    />
+                    ”
+                  </div>
 
 
                   {/* NOMBRE */}
@@ -696,9 +692,16 @@ export default async function Home({
                   )}
                   <div className="p-6">
                     <h3 className="font-serif text-xl text-[#20231F]">{publicacion.titulo}</h3>
-                    <p className="mt-2 text-sm leading-6 text-[#707469]">
-                      {publicacion.resumen || publicacion.contenido.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 180)}
-                    </p>
+                    <RichText
+                      value={
+                        publicacion.resumen ||
+                        richTextToPlainText(publicacion.contenido)
+                          .replace(/\s+/g, " ")
+                          .trim()
+                          .slice(0, 180)
+                      }
+                      className="mt-2 line-clamp-3 text-sm leading-6 text-[#707469]"
+                    />
                     <span className="mt-4 inline-block text-sm font-medium text-[#B95B32]">Leer más →</span>
                   </div>
                 </Link>

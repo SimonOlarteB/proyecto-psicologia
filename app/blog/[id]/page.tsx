@@ -3,6 +3,7 @@ import {
   obtenerPublicacionPublica,
   type PublicacionPublica,
 } from "../../lib/contenido-publico";
+import RichText from "../../components/RichText";
 
 export const dynamic = "force-dynamic";
 
@@ -166,9 +167,10 @@ export default async function ArticuloBlog({
             </h1>
 
             {publicacion.resumen && (
-              <p className="mt-6 max-w-3xl text-lg leading-8 text-[#62675B] sm:text-xl">
-                {publicacion.resumen}
-              </p>
+              <RichText
+                value={publicacion.resumen}
+                className="mt-6 max-w-3xl text-lg leading-8 text-[#62675B] sm:text-xl"
+              />
             )}
 
           </div>
@@ -202,9 +204,10 @@ export default async function ArticuloBlog({
 
           <div className="rounded-[32px] bg-white px-6 py-8 shadow-sm sm:px-10 sm:py-12 md:px-14">
 
-            <div className="whitespace-pre-line text-base leading-8 text-[#59614D] sm:text-lg sm:leading-9">
-              {publicacion.contenido}
-            </div>
+            <RichText
+              value={publicacion.contenido}
+              className="text-base leading-8 text-[#59614D] sm:text-lg sm:leading-9"
+            />
 
           </div>
 

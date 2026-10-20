@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import AdminNav from "../../components/AdminNav";
+import RichText from "../../components/RichText";
+import RichTextEditor from "../../components/admin/RichTextEditor";
 
 type TipoFormacion =
     | "CURSO"
@@ -452,11 +454,10 @@ export default function CursosDiplomasPage() {
                                         )}
 
                                         {elemento.descripcion && (
-                                            <p className="mt-3 text-sm leading-6 text-[#707469]">
-                                                {
-                                                    elemento.descripcion
-                                                }
-                                            </p>
+                                            <RichText
+                                                value={elemento.descripcion}
+                                                className="mt-3 text-sm leading-6 text-[#707469]"
+                                            />
                                         )}
 
                                         {(elemento.fecha_inicio ||
@@ -782,22 +783,19 @@ export default function CursosDiplomasPage() {
                                         </span>
                                     </label>
 
-                                    <textarea
-                                        rows={4}
+                                    <RichTextEditor
                                         value={
                                             formulario.descripcion
                                         }
-                                        onChange={(e) =>
+                                        onChange={(descripcion) =>
                                             setFormulario({
                                                 ...formulario,
-                                                descripcion:
-                                                    e
-                                                        .target
-                                                        .value,
+                                                descripcion,
                                             })
                                         }
+                                        label="Descripción de la formación"
                                         placeholder="Información adicional..."
-                                        className="w-full resize-y rounded-2xl border border-[#D8D0C5] bg-white px-4 py-3 text-sm leading-6 outline-none transition focus:border-[#C56835] focus:ring-2 focus:ring-[#C56835]/10"
+                                        minHeight="7rem"
                                     />
 
                                 </div>

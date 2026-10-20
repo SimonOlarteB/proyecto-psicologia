@@ -21,6 +21,7 @@ export async function GET() {
         nombre,
         descripcion,
         tipo_servicio,
+        categoria,
         precio,
         duracion_minutos,
         modalidad,
@@ -62,6 +63,7 @@ export async function POST(request: Request) {
       nombre,
       descripcion,
       tipo_servicio = "NORMAL",
+      categoria = "PERSONAS",
       precio,
       duracion_minutos,
       modalidad,
@@ -98,6 +100,13 @@ export async function POST(request: Request) {
       );
     }
 
+    if (!["PERSONAS", "EMPRESAS"].includes(categoria)) {
+      return NextResponse.json(
+        { error: "La categoría debe ser Personas o Empresas." },
+        { status: 400 }
+      );
+    }
+
     if (!esEspecial && !["PRESENCIAL", "VIRTUAL", "AMBAS"].includes(modalidadFinal)) {
   return NextResponse.json(
     { error: "La modalidad no es válida." },
@@ -128,17 +137,19 @@ export async function POST(request: Request) {
         nombre,
         descripcion,
         tipo_servicio,
+        categoria,
         precio,
         duracion_minutos,
         modalidad,
         activo
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `,
       [
         nombre.trim(),
         descripcion?.trim() || "",
         tipo_servicio,
+        categoria,
         precioFinal,
         duracionFinal,
         modalidadFinal,
@@ -183,6 +194,7 @@ export async function PUT(request: Request) {
       nombre,
       descripcion,
       tipo_servicio = "NORMAL",
+      categoria = "PERSONAS",
       precio,
       duracion_minutos,
       modalidad,
@@ -220,6 +232,13 @@ export async function PUT(request: Request) {
       );
     }
 
+    if (!["PERSONAS", "EMPRESAS"].includes(categoria)) {
+      return NextResponse.json(
+        { error: "La categoría debe ser Personas o Empresas." },
+        { status: 400 }
+      );
+    }
+
     if (!esEspecial && !["PRESENCIAL", "VIRTUAL", "AMBAS"].includes(modalidadFinal)) {
       return NextResponse.json(
         { error: "La modalidad no es válida." },
@@ -251,6 +270,7 @@ export async function PUT(request: Request) {
         nombre = ?,
         descripcion = ?,
         tipo_servicio = ?,
+        categoria = ?,
         precio = ?,
         duracion_minutos = ?,
         modalidad = ?,
@@ -261,6 +281,7 @@ export async function PUT(request: Request) {
         nombre.trim(),
         descripcion?.trim() || "",
         tipo_servicio,
+        categoria,
         precioFinal,
         duracionFinal,
         modalidadFinal,
