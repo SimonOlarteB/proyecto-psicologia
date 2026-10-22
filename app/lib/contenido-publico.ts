@@ -27,6 +27,18 @@ export interface ServicioPublico extends RowDataPacket {
   activo: number;
 }
 
+export interface PromocionPublica extends RowDataPacket {
+  id: number;
+  titulo: string;
+  descripcion: string;
+  porcentaje_descuento: number;
+  accion: "COTIZAR" | "AGENDAR";
+  servicio_id: number | null;
+  enlace: string | null;
+  activo: number;
+  orden: number;
+}
+
 export async function obtenerPerfilPublico() {
   const [filas] = await pool.query<RowDataPacket[]>(`
     SELECT
@@ -97,6 +109,36 @@ export async function obtenerServicioPublico(id: number) {
   );
 
   return filas[0] ?? null;
+}
+
+// Promociones activas para la página de inicio.
+// Si la tabla aún no existe o la consulta falla, devuelve una lista vacía
+// para no afectar el resto de la página.
+export async function obtenerPromocionesPublicas(): Promise<
+  PromocionPublica[]
+> {
+  try {
+    const [filas] = await pool.query<PromocionPublica[]>(`
+      SELECT
+        id,
+        titulo,
+        descripcion,
+        porcentaje_descuento,
+        accion,
+        servicio_id,
+        enlace,
+        activo,
+        orden
+      FROM promociones
+      WHERE activo = 1
+      ORDER BY orden ASC, id DESC
+    `);
+
+    return filas;
+  } catch (error) {
+    console.error("Error cargando promociones:", error);
+    return [];
+  }
 }
 
 export async function obtenerTrayectoriaPublica() {

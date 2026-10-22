@@ -159,6 +159,7 @@ export async function POST(request: Request) {
       telefono,
       acepta_tratamiento_datos,
       servicio_id,
+      promocion_id,
       fecha,
       hora,
       modalidad,
@@ -408,16 +409,66 @@ export async function POST(request: Request) {
     }
 
     // ====================================================
-    // PRECIO
+    // PRECIO (con promoción, calculado SOLO en el servidor)
+    // ====================================================
+    //
+    // El navegador solo envía el id de la promoción.
+    // El porcentaje y el servicio al que aplica se leen
+    // de la base de datos, así nadie puede alterar el
+    // descuento desde el cliente.
     // ====================================================
 
-    const monto = Number(servicio.precio);
+    let monto = Number(servicio.precio);
+    let porcentajeDescuento = 0;
+
+    if (
+      promocion_id !== undefined &&
+      promocion_id !== null &&
+      promocion_id !== ""
+    ) {
+      const [promociones] = await conexion.query<RowDataPacket[]>(
+        `
+        SELECT
+          id,
+          porcentaje_descuento,
+          servicio_id
+        FROM promociones
+        WHERE id = ?
+          AND activo = 1
+          AND accion = 'AGENDAR'
+        LIMIT 1
+        `,
+        [promocion_id]
+      );
+
+      const promocion = promociones[0];
+
+      if (
+        !promocion ||
+        Number(promocion.servicio_id) !== Number(servicio.id)
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              "La promoción ya no está disponible para este servicio. Actualiza la página e inténtalo de nuevo.",
+          },
+          { status: 400 }
+        );
+      }
+
+      porcentajeDescuento = Number(promocion.porcentaje_descuento) || 0;
+
+      // Se redondea a pesos enteros.
+      monto = Math.round((monto * (100 - porcentajeDescuento)) / 100);
+    }
 
     if (!Number.isFinite(monto) || monto <= 0) {
       return NextResponse.json(
         {
           error:
-            "El servicio seleccionado no tiene un precio válido.",
+            porcentajeDescuento > 0
+              ? "El valor a pagar con la promoción no es válido."
+              : "El servicio seleccionado no tiene un precio válido.",
         },
         { status: 400 }
       );
@@ -639,6 +690,7 @@ export async function POST(request: Request) {
         cliente_id: clienteId,
         referencia,
         monto,
+        descuento_aplicado: porcentajeDescuento,
         moneda: "COP",
         checkout_url: checkoutUrl,
         expiration_time: expirationTime,

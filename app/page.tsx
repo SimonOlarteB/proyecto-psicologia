@@ -1,13 +1,17 @@
 import ScrollToTop from "./ScrollToTop";
 import Link from "next/link";
+import { Briefcase, Check, GraduationCap, User, Users } from "lucide-react";
 import ServicioCard from "./components/ServicioCard";
+import PromocionCard from "./components/PromocionCard";
 import RichText from "./components/RichText";
 import {
   obtenerPerfilPublico,
+  obtenerPromocionesPublicas,
   obtenerPublicacionesPublicas,
   obtenerServiciosPublicos,
   obtenerTestimoniosPublicos,
   obtenerTrayectoriaPublica,
+  type PromocionPublica,
   type PublicacionPublica,
 } from "./lib/contenido-publico";
 import { richTextToPlainText } from "./lib/rich-text";
@@ -27,6 +31,7 @@ export default async function Home({
   let trayectoria: Awaited<ReturnType<typeof obtenerTrayectoriaPublica>> = [];
   let testimonios: Awaited<ReturnType<typeof obtenerTestimoniosPublicos>> = [];
   let publicaciones: PublicacionPublica[] = [];
+  let promociones: PromocionPublica[] = [];
 
   try {
     const resultado = await Promise.all([
@@ -35,6 +40,7 @@ export default async function Home({
       obtenerTrayectoriaPublica(),
       obtenerTestimoniosPublicos(),
       obtenerPublicacionesPublicas(),
+      obtenerPromocionesPublicas(),
     ]);
 
     servicios = resultado[0];
@@ -42,6 +48,7 @@ export default async function Home({
     trayectoria = resultado[2];
     testimonios = resultado[3];
     publicaciones = resultado[4];
+    promociones = resultado[5];
   } catch (error) {
     console.error("Error cargando la página de inicio:", error);
   }
@@ -205,7 +212,7 @@ export default async function Home({
 
           {/* TEXTO PRINCIPAL */}
           <div className="relative z-10 py-4 lg:py-10">
-            <p className="mb-5 text-[10px] font-semibold uppercase tracking-[0.34em] text-[#59614D]">
+            <p className="mb-6 inline-block rounded-full bg-[#E3DCD0] px-4 py-2 text-sm font-semibold text-[#4A5040]">
               Tu bienestar importa
             </p>
 
@@ -242,7 +249,7 @@ export default async function Home({
           </div>
 
           {/* FOTO PRINCIPAL */}
-          {fotoPerfil && (
+          {fotoPerfil ? (
             <div className="relative mx-auto w-full max-w-[520px] lg:translate-y-2">
 
               <div className="absolute left-4 top-0 h-[88%] w-[88%] rounded-full bg-[#E6B991]" />
@@ -269,6 +276,13 @@ export default async function Home({
 
               </div>
 
+            </div>
+          ) : (
+            <div className="mx-auto flex h-[390px] w-full max-w-[470px] flex-col items-center justify-center rounded-t-full rounded-b-[2rem] bg-[#E3DCD0] text-[#59614D] sm:h-[470px] lg:h-[560px]">
+              <User className="h-12 w-12" strokeWidth={1.5} aria-hidden="true" />
+              <p className="mt-3 text-sm font-semibold">
+                Fotografía de {nombreProfesional}
+              </p>
             </div>
           )}
 
@@ -352,93 +366,206 @@ export default async function Home({
       </section>
 
 
-      {/* SERVICIOS */}
-      <section
-        id="servicios"
-        className="relative bg-[#F7F1E9] px-6 py-24 md:py-28"
-      >
+{/* SERVICIOS */}
+<section
+  id="servicios"
+  className="relative bg-[#F7F1E9] px-6 py-24 md:py-28"
+>
 
-        <div className="mx-auto max-w-7xl">
+  <div className="mx-auto max-w-7xl">
 
-          {/* ENCABEZADO */}
-          <div className="mx-auto max-w-2xl text-center">
+    {/* ENCABEZADO */}
+    <div className="mx-auto max-w-2xl text-center">
 
-            <p className="font-serif text-lg italic text-[#C56835]">
-              Servicios
-            </p>
+      <p className="font-serif text-lg italic text-[#C56835]">
+        Servicios
+      </p>
 
-            <h2 className="mt-3 font-serif text-4xl text-[#3F4635] md:text-5xl">
-              Un acompañamiento pensado para ti
-            </h2>
+      <h2 className="mt-3 font-serif text-4xl text-[#3F4635] md:text-5xl">
+        Un acompañamiento pensado para ti
+      </h2>
 
-            <p className="mt-5 text-base leading-7 text-[#707469] md:text-lg">
-              Espacios de acompañamiento profesional diseñados para
-              cuidar tu bienestar emocional y favorecer tu crecimiento personal.
-            </p>
+      <p className="mt-5 text-base leading-7 text-[#707469] md:text-lg">
+        Espacios de acompañamiento profesional diseñados para
+        cuidar tu bienestar emocional y favorecer tu crecimiento personal.
+      </p>
 
+    </div>
+
+
+    <div className="mt-14 space-y-16">
+      {[
+        {
+          categoria: "personas",
+          titulo: "Para personas",
+          descripcion: "Acompañamiento profesional para tu bienestar y crecimiento personal.",
+          servicios: serviciosPersonas,
+          href: "/servicios/personas",
+        },
+      ].map((grupo) => (
+        <div key={grupo.categoria}>
+          <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h3 className="text-sm font-semibold uppercase tracking-wider text-[#BC5A32]">
+                {grupo.titulo}
+              </h3>
+              <p className="mt-3 text-sm leading-6 text-[#707469]">
+                {grupo.descripcion}
+              </p>
+            </div>
           </div>
 
+          {grupo.servicios.length > 0 ? (
+            <div className="grid gap-6 md:grid-cols-2">
+              {grupo.servicios.map((servicio) => (
+                <ServicioCard key={servicio.id} servicio={servicio} />
+              ))}
+            </div>
+          ) : (
+            <p className="rounded-2xl border border-dashed border-[#D8D0C5] p-8 text-center text-sm text-[#707469]">
+              Pronto encontrarás aquí los servicios para {grupo.categoria}.
+            </p>
+          )}
 
-          <div className="mt-14 space-y-16">
-            {[
-              {
-                categoria: "personas",
-                titulo: "Para personas",
-                descripcion: "Acompañamiento profesional para tu bienestar y crecimiento personal.",
-                servicios: serviciosPersonas,
-                href: "/servicios/personas",
-              },
-              {
-                categoria: "empresas",
-                titulo: "Para empresas",
-                descripcion: "Servicios de bienestar, desarrollo y acompañamiento para organizaciones.",
-                servicios: serviciosEmpresas,
-                href: "/servicios/empresas",
-              },
-            ].map((grupo) => (
-              <div key={grupo.categoria}>
-                <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-                  <div>
-                    <h3 className="font-serif text-3xl text-[#3F4635]">
-                      {grupo.titulo}
-                    </h3>
-                    <p className="mt-2 text-sm leading-6 text-[#707469]">
-                      {grupo.descripcion}
-                    </p>
-                  </div>
+          {grupo.categoria === "personas" && promociones.length > 0 && (
+            <div className="mt-8 space-y-4">
+              {promociones.map((promocion) => (
+                <PromocionCard
+                  key={promocion.id}
+                  promocion={promocion}
+                  whatsappLink={whatsappLink}
+                />
+              ))}
+            </div>
+          )}
+
+          <div className="mt-6 text-center">
+            <Link
+              href={grupo.href}
+              className="inline-flex rounded-full border border-[#59614D] px-6 py-3 text-sm font-medium text-[#59614D] transition hover:bg-[#59614D] hover:text-white"
+            >
+              Ver más servicios
+            </Link>
+          </div>
+        </div>
+      ))}
+    </div>
+
+  </div>
+
+</section>
+
+
+{/* SERVICIOS PARA EMPRESAS */}
+<section className="bg-[#E9E8DE] px-6 py-20 md:py-24">
+  <div className="mx-auto grid max-w-7xl gap-12 lg:grid-cols-2 lg:gap-16">
+
+    {/* COLUMNA IZQUIERDA */}
+    <div className="lg:pt-2">
+      <p className="text-sm font-semibold uppercase tracking-wider text-[#BC5A32]">
+        Para empresas
+      </p>
+
+      <h2 className="mt-5 font-serif text-4xl font-bold leading-tight text-[#3F4635] md:text-5xl">
+        Bienestar y desarrollo humano para tu organización
+      </h2>
+
+      <p className="mt-6 max-w-md text-base leading-7 text-[#707469] md:text-lg">
+        Servicios de bienestar, desarrollo y acompañamiento para organizaciones.
+      </p>
+
+      <ul className="mt-6 space-y-3">
+        {[
+          "Gestión del talento humano",
+          "Gestión del cambio y del conocimiento",
+          "Salud mental y bienestar en equipos de trabajo",
+        ].map((item) => (
+          <li key={item} className="flex items-center gap-3 text-[#2F3329]">
+            <Check className="h-4 w-4 text-[#59614D]" />
+            <span className="text-[15px]">{item}</span>
+          </li>
+        ))}
+      </ul>
+
+      <a
+        href={
+          whatsappLink
+            ? `https://wa.me/${whatsappLink}?text=${encodeURIComponent("Hola, me gustaría solicitar una propuesta de servicios para mi empresa.")}`
+            : "#contacto"
+        }
+        target={whatsappLink ? "_blank" : undefined}
+        rel={whatsappLink ? "noopener noreferrer" : undefined}
+        className="mt-8 inline-flex rounded-full bg-[#BC5A32] px-8 py-4 text-sm font-semibold text-white transition hover:bg-[#A84E2A]"
+      >
+        Solicitar propuesta
+      </a>
+
+      <p className="mt-4 text-sm text-[#707469]">
+        Atención personalizada · Cotización previa
+      </p>
+    </div>
+
+    {/* COLUMNA DERECHA */}
+    <div>
+      {serviciosEmpresas.length > 0 ? (
+        <div className="space-y-4">
+          {serviciosEmpresas.map((servicio, index) => {
+            const Icono = [Briefcase, Users, GraduationCap][index % 3];
+
+            return (
+              <article
+                key={servicio.id}
+                className="flex gap-4 rounded-[28px] bg-white p-6 md:p-7"
+              >
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#E9E8DE] text-[#59614D]">
+                  <Icono className="h-5 w-5" />
                 </div>
 
-                {grupo.servicios.length > 0 ? (
-                  <div className="grid gap-6 md:grid-cols-2">
-                    {grupo.servicios.map((servicio) => (
-                      <ServicioCard key={servicio.id} servicio={servicio} />
-                    ))}
-                  </div>
-                ) : (
-                  <p className="rounded-2xl border border-dashed border-[#D8D0C5] p-8 text-center text-sm text-[#707469]">
-                    Pronto encontrarás aquí los servicios para {grupo.categoria}.
-                  </p>
-                )}
+                <div className="min-w-0">
+                  <h3 className="text-lg font-semibold leading-snug text-[#2F3329]">
+                    {servicio.nombre}
+                  </h3>
 
-                <div className="mt-6 text-center">
+                  {servicio.descripcion && (
+                    <RichText
+                      value={servicio.descripcion}
+                      className="mt-1.5 line-clamp-2 text-sm leading-6 text-[#5F6358]"
+                    />
+                  )}
+
                   <Link
-                    href={grupo.href}
-                    className="inline-flex rounded-full border border-[#59614D] px-6 py-3 text-sm font-medium text-[#59614D] transition hover:bg-[#59614D] hover:text-white"
+                    href={`/servicios/${servicio.id}`}
+                    className="mt-2 inline-block text-sm font-semibold text-[#BC5A32] underline underline-offset-2"
                   >
-                    Ver servicios
+                    Ver servicio →
                   </Link>
                 </div>
-              </div>
-            ))}
-          </div>
-
+              </article>
+            );
+          })}
         </div>
+      ) : (
+        <p className="rounded-2xl border border-dashed border-[#C9C7BA] p-8 text-center text-sm text-[#707469]">
+          Pronto encontrarás aquí los servicios para empresas.
+        </p>
+      )}
 
-      </section>
+      <div className="mt-5 flex justify-end">
+        <Link
+          href="/servicios/empresas"
+          className="inline-flex rounded-full border border-[#59614D] px-7 py-3 text-sm font-medium text-[#3F4635] transition hover:bg-[#59614D] hover:text-white"
+        >
+          Ver más servicios →
+        </Link>
+      </div>
+    </div>
+
+  </div>
+</section>
 
 
       {/* SOBRE MI */}
-      <section id="sobre-mi" className="relative overflow-hidden bg-[#E9E9DF] px-6 py-24 text-[#30372B] md:py-28">
+      <section id="sobre-mi" className="relative overflow-hidden bg-[#F7F1E9] px-6 py-24 text-[#30372B] md:py-28">
         <style>{`
           .diploma-modal { opacity: 0; pointer-events: none; transition: opacity 220ms ease; }
           .diploma-modal:target { opacity: 1; pointer-events: auto; }
