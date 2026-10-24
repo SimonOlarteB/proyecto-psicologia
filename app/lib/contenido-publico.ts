@@ -47,6 +47,7 @@ export async function obtenerPerfilPublico() {
       profesion,
       descripcion,
       foto_url,
+      foto_sobre_mi_url,
       logo_url,
       whatsapp,
       correo,

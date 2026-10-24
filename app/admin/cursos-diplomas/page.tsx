@@ -41,6 +41,14 @@ const formularioInicial: Formulario = {
     imagen_url: "",
 };
 
+const TIPOS_IMAGEN_PERMITIDOS = [
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+];
+
+const TAMANO_MAXIMO_IMAGEN = 5 * 1024 * 1024;
+
 export default function CursosDiplomasPage() {
     const [elementos, setElementos] = useState<Trayectoria[]>([]);
     const [cargando, setCargando] = useState(true);
@@ -55,9 +63,18 @@ export default function CursosDiplomasPage() {
         useState<Formulario>(formularioInicial);
 
     const [guardando, setGuardando] = useState(false);
+
+    // Logo de la institución (imagen del registro)
     const [archivoImagen, setArchivoImagen] = useState<File | null>(null);
     const [vistaPreviaImagen, setVistaPreviaImagen] = useState("");
     const [quitarImagen, setQuitarImagen] = useState(false);
+
+    // Foto de la sección "Sobre mí"
+    const [fotoActual, setFotoActual] = useState("");
+    const [archivoFoto, setArchivoFoto] = useState<File | null>(null);
+    const [vistaPreviaFoto, setVistaPreviaFoto] = useState("");
+    const [quitarFoto, setQuitarFoto] = useState(false);
+    const [guardandoFoto, setGuardandoFoto] = useState(false);
 
     const [alerta, setAlerta] = useState<{
         tipo: "exito" | "error";
@@ -67,7 +84,140 @@ export default function CursosDiplomasPage() {
 
     useEffect(() => {
         cargarElementos();
+        cargarFotoSobreMi();
     }, []);
+
+    function validarImagen(archivo: File, nombre: string) {
+        if (!TIPOS_IMAGEN_PERMITIDOS.includes(archivo.type)) {
+            setAlerta({
+                tipo: "error",
+                titulo: "Formato no válido",
+                mensaje: "Solo puedes subir imágenes JPG, PNG o WEBP.",
+            });
+
+            return false;
+        }
+
+        if (archivo.size > TAMANO_MAXIMO_IMAGEN) {
+            setAlerta({
+                tipo: "error",
+                titulo: "Imagen demasiado grande",
+                mensaje: `${nombre} no puede superar los 5 MB.`,
+            });
+
+            return false;
+        }
+
+        return true;
+    }
+
+    async function cargarFotoSobreMi() {
+        try {
+            const respuesta = await fetch(
+                "/api/perfil/foto-sobre-mi",
+                {
+                    cache: "no-store",
+                }
+            );
+
+            if (!respuesta.ok) {
+                throw new Error(
+                    "No se pudo cargar la foto de Sobre mí."
+                );
+            }
+
+            const datos = await respuesta.json();
+            const url = datos.foto_sobre_mi_url || "";
+
+            setFotoActual(url);
+            setVistaPreviaFoto(url);
+            setArchivoFoto(null);
+            setQuitarFoto(false);
+        } catch (error) {
+            console.error(error);
+        }
+    }
+
+    async function guardarFoto() {
+        try {
+            setGuardandoFoto(true);
+
+            let nuevaUrl = fotoActual;
+
+            if (archivoFoto) {
+                const datosImagen = new FormData();
+                datosImagen.append("file", archivoFoto);
+
+                const respuestaImagen = await fetch(
+                    "/api/trayectoria/upload",
+                    {
+                        method: "POST",
+                        body: datosImagen,
+                    }
+                );
+
+                const resultadoImagen = await respuestaImagen.json();
+
+                if (!respuestaImagen.ok) {
+                    throw new Error(
+                        resultadoImagen.error ||
+                            "No se pudo subir la fotografía."
+                    );
+                }
+
+                nuevaUrl = resultadoImagen.url;
+            } else if (quitarFoto) {
+                nuevaUrl = "";
+            }
+
+            const respuesta = await fetch(
+                "/api/perfil/foto-sobre-mi",
+                {
+                    method: "PUT",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        foto_sobre_mi_url: nuevaUrl,
+                    }),
+                }
+            );
+
+            const resultado = await respuesta.json();
+
+            if (!respuesta.ok) {
+                throw new Error(
+                    resultado.error ||
+                        "No se pudo guardar la fotografía."
+                );
+            }
+
+            setFotoActual(nuevaUrl);
+            setVistaPreviaFoto(nuevaUrl);
+            setArchivoFoto(null);
+            setQuitarFoto(false);
+
+            setAlerta({
+                tipo: "exito",
+                titulo: "Fotografía actualizada",
+                mensaje:
+                    "La foto de la sección Sobre mí se guardó correctamente.",
+            });
+        } catch (error) {
+            console.error(error);
+
+            setAlerta({
+                tipo: "error",
+                titulo: "No se pudo guardar",
+                mensaje:
+                    error instanceof Error
+                        ? error.message
+                        : "Ocurrió un error.",
+            });
+        } finally {
+            setGuardandoFoto(false);
+        }
+    }
 
     async function cargarElementos() {
         try {
@@ -492,11 +642,11 @@ export default function CursosDiplomasPage() {
                                         )}
 
                                         {elemento.imagen_url && (
-                                            <div className="mt-4 overflow-hidden rounded-2xl border border-[#E1DBD2] bg-white">
+                                            <div className="mt-4 inline-flex rounded-xl border border-[#E1DBD2] bg-white p-3">
                                                 <img
                                                     src={elemento.imagen_url}
-                                                    alt={`Imagen de ${elemento.titulo}`}
-                                                    className="h-48 w-full object-contain bg-[#F7F1E9]"
+                                                    alt={`Logo de ${elemento.institucion || elemento.titulo}`}
+                                                    className="h-12 max-w-[200px] object-contain"
                                                 />
                                             </div>
                                         )}
@@ -543,6 +693,8 @@ export default function CursosDiplomasPage() {
             </section>
         );
     }
+
+    const hayCambiosFoto = archivoFoto !== null || quitarFoto;
 
     return (
         <>
@@ -603,6 +755,123 @@ export default function CursosDiplomasPage() {
                         </button>
 
                     </div>
+
+
+                    {/* FOTO DE SOBRE MÍ */}
+                    <section className="mb-8 rounded-3xl border border-[#E1DBD2] bg-white p-5 shadow-sm sm:p-7">
+
+                        <div className="mb-5">
+                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#C56835]">
+                                Sobre mí
+                            </p>
+
+                            <h2 className="mt-1 font-serif text-2xl">
+                                Foto de la sección Sobre mí
+                            </h2>
+
+                            <p className="mt-1 text-sm text-[#707469]">
+                                Aparece junto al título &quot;Formación y
+                                trayectoria&quot; en la página principal. Es
+                                independiente de la foto del inicio.
+                            </p>
+                        </div>
+
+                        <div className="flex flex-col items-start gap-5 sm:flex-row sm:items-center">
+
+                            <div className="flex h-[200px] w-[200px] shrink-0 items-center justify-center overflow-hidden rounded-[32px] border border-[#E1DBD2] bg-[#FCFAF7]">
+                                {vistaPreviaFoto ? (
+                                    <img
+                                        src={vistaPreviaFoto}
+                                        alt="Foto de Sobre mí"
+                                        className="h-full w-full object-cover"
+                                    />
+                                ) : (
+                                    <span className="px-4 text-center text-sm text-[#8A8D84]">
+                                        Sin fotografía
+                                    </span>
+                                )}
+                            </div>
+
+                            <div className="flex flex-col gap-3">
+
+                                <div className="flex flex-col gap-2 sm:flex-row">
+
+                                    <label className="cursor-pointer rounded-full border border-[#D8D0C5] px-5 py-2.5 text-center text-xs font-medium transition hover:border-[#C56835] hover:text-[#C56835]">
+                                        {vistaPreviaFoto
+                                            ? "Cambiar fotografía"
+                                            : "Seleccionar fotografía"}
+
+                                        <input
+                                            type="file"
+                                            accept="image/jpeg,image/png,image/webp"
+                                            className="hidden"
+                                            onChange={(e) => {
+                                                const archivo =
+                                                    e.target.files?.[0];
+
+                                                if (!archivo) return;
+
+                                                if (
+                                                    !validarImagen(
+                                                        archivo,
+                                                        "La fotografía"
+                                                    )
+                                                ) {
+                                                    e.target.value = "";
+                                                    return;
+                                                }
+
+                                                setArchivoFoto(archivo);
+                                                setVistaPreviaFoto(
+                                                    URL.createObjectURL(
+                                                        archivo
+                                                    )
+                                                );
+                                                setQuitarFoto(false);
+                                            }}
+                                        />
+                                    </label>
+
+                                    {vistaPreviaFoto && (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setArchivoFoto(null);
+                                                setVistaPreviaFoto("");
+                                                setQuitarFoto(
+                                                    Boolean(fotoActual)
+                                                );
+                                            }}
+                                            className="rounded-full border border-red-200 px-5 py-2.5 text-center text-xs font-medium text-red-700 transition hover:bg-red-50"
+                                        >
+                                            Quitar fotografía
+                                        </button>
+                                    )}
+
+                                </div>
+
+                                <p className="text-xs text-[#8A8D84]">
+                                    JPG, PNG o WEBP · máximo 5 MB
+                                </p>
+
+                                {hayCambiosFoto && (
+                                    <button
+                                        type="button"
+                                        onClick={guardarFoto}
+                                        disabled={guardandoFoto}
+                                        className="w-full rounded-full bg-[#C56835] px-6 py-3 text-sm font-medium text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+                                    >
+                                        {guardandoFoto
+                                            ? "Guardando..."
+                                            : "Guardar foto"}
+                                    </button>
+                                )}
+
+                            </div>
+
+                        </div>
+
+                    </section>
 
 
                     {cargando ? (
@@ -801,10 +1070,10 @@ export default function CursosDiplomasPage() {
                                 </div>
 
 
-                                {/* IMAGEN */}
+                                {/* LOGO DE LA INSTITUCIÓN */}
                                 <div>
                                     <label className="mb-2 block text-sm font-medium">
-                                        Imagen del diploma / certificado
+                                        Logo de la institución
                                         <span className="ml-1 text-xs text-[#8A8D84]">
                                             (opcional)
                                         </span>
@@ -813,17 +1082,17 @@ export default function CursosDiplomasPage() {
                                     <div className="rounded-2xl border border-dashed border-[#D8D0C5] bg-white p-4">
                                         {vistaPreviaImagen ? (
                                             <div className="space-y-3">
-                                                <div className="overflow-hidden rounded-2xl border border-[#E1DBD2] bg-[#F7F1E9]">
+                                                <div className="flex justify-center overflow-hidden rounded-2xl border border-[#E1DBD2] bg-[#F7F1E9] p-4">
                                                     <img
                                                         src={vistaPreviaImagen}
-                                                        alt="Vista previa"
-                                                        className="max-h-72 w-full object-contain"
+                                                        alt="Vista previa del logo"
+                                                        className="max-h-32 w-auto max-w-full object-contain"
                                                     />
                                                 </div>
 
                                                 <div className="flex flex-col gap-2 sm:flex-row">
                                                     <label className="cursor-pointer rounded-full border border-[#D8D0C5] px-5 py-2.5 text-center text-xs font-medium transition hover:border-[#C56835] hover:text-[#C56835]">
-                                                        Cambiar imagen
+                                                        Cambiar logo
                                                         <input
                                                             type="file"
                                                             accept="image/jpeg,image/png,image/webp"
@@ -835,34 +1104,11 @@ export default function CursosDiplomasPage() {
                                                                 if (!archivo) return;
 
                                                                 if (
-                                                                    ![
-                                                                        "image/jpeg",
-                                                                        "image/png",
-                                                                        "image/webp",
-                                                                    ].includes(
-                                                                        archivo.type
+                                                                    !validarImagen(
+                                                                        archivo,
+                                                                        "El logo"
                                                                     )
                                                                 ) {
-                                                                    setAlerta({
-                                                                        tipo: "error",
-                                                                        titulo: "Formato no válido",
-                                                                        mensaje:
-                                                                            "Solo puedes subir imágenes JPG, PNG o WEBP.",
-                                                                    });
-                                                                    e.target.value = "";
-                                                                    return;
-                                                                }
-
-                                                                if (
-                                                                    archivo.size >
-                                                                    5 * 1024 * 1024
-                                                                ) {
-                                                                    setAlerta({
-                                                                        tipo: "error",
-                                                                        titulo: "Imagen demasiado grande",
-                                                                        mensaje:
-                                                                            "La imagen no puede superar los 5 MB.",
-                                                                    });
                                                                     e.target.value = "";
                                                                     return;
                                                                 }
@@ -901,15 +1147,15 @@ export default function CursosDiplomasPage() {
                                                         }}
                                                         className="rounded-full border border-red-200 px-5 py-2.5 text-center text-xs font-medium text-red-700 transition hover:bg-red-50"
                                                     >
-                                                        Quitar imagen
+                                                        Quitar logo
                                                     </button>
                                                 </div>
                                             </div>
                                         ) : (
                                             <label className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border border-[#E1DBD2] bg-[#FCFAF7] px-5 py-8 text-center transition hover:border-[#C56835]">
-                                                <span className="text-3xl">🖼️</span>
+                                                <span className="text-3xl">🏛️</span>
                                                 <span className="mt-3 text-sm font-medium text-[#3F4635]">
-                                                    Seleccionar imagen
+                                                    Seleccionar logo
                                                 </span>
                                                 <span className="mt-1 text-xs text-[#8A8D84]">
                                                     JPG, PNG o WEBP · máximo 5 MB
@@ -925,34 +1171,11 @@ export default function CursosDiplomasPage() {
                                                         if (!archivo) return;
 
                                                         if (
-                                                            ![
-                                                                "image/jpeg",
-                                                                "image/png",
-                                                                "image/webp",
-                                                            ].includes(
-                                                                archivo.type
+                                                            !validarImagen(
+                                                                archivo,
+                                                                "El logo"
                                                             )
                                                         ) {
-                                                            setAlerta({
-                                                                tipo: "error",
-                                                                titulo: "Formato no válido",
-                                                                mensaje:
-                                                                    "Solo puedes subir imágenes JPG, PNG o WEBP.",
-                                                            });
-                                                            e.target.value = "";
-                                                            return;
-                                                        }
-
-                                                        if (
-                                                            archivo.size >
-                                                            5 * 1024 * 1024
-                                                        ) {
-                                                            setAlerta({
-                                                                tipo: "error",
-                                                                titulo: "Imagen demasiado grande",
-                                                                mensaje:
-                                                                    "La imagen no puede superar los 5 MB.",
-                                                            });
                                                             e.target.value = "";
                                                             return;
                                                         }

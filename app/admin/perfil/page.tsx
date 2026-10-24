@@ -623,7 +623,7 @@ export default function PerfilAdminPage() {
                                         </p>
                                     </div>
 
-                                    <div>
+                                   <div>
                                         <label className="mb-2 block text-sm font-medium">
                                             Fotografía profesional
                                             <span className="ml-1 text-xs text-[#8A8D84]">

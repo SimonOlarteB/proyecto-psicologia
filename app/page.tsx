@@ -3,6 +3,9 @@ import Link from "next/link";
 import { Briefcase, Check, GraduationCap, User, Users } from "lucide-react";
 import ServicioCard from "./components/ServicioCard";
 import PromocionCard from "./components/PromocionCard";
+import TrayectoriaLista, {
+  type ElementoTrayectoria,
+} from "./components/TrayectoriaLista";
 import RichText from "./components/RichText";
 import {
   obtenerPerfilPublico,
@@ -103,6 +106,49 @@ export default async function Home({
       perfil.logo_url.startsWith("/"))
       ? perfil.logo_url
       : "";
+
+  // Foto exclusiva de la sección "Sobre mí"
+  const fotoSobreMi =
+    perfil?.foto_sobre_mi_url &&
+    (perfil.foto_sobre_mi_url.startsWith("http://") ||
+      perfil.foto_sobre_mi_url.startsWith("https://") ||
+      perfil.foto_sobre_mi_url.startsWith("/"))
+      ? perfil.foto_sobre_mi_url
+      : "";
+
+  // Formación y trayectoria: la imagen guardada en el campo imagen_url
+  // se muestra ahora como logo de la institución.
+  const formatearMesYAnio = (valor: unknown) => {
+    if (!valor) return "";
+
+    const texto = new Date(valor as string | Date).toLocaleDateString(
+      "es-CO",
+      { month: "long", year: "numeric" }
+    );
+
+    return texto.charAt(0).toUpperCase() + texto.slice(1);
+  };
+
+  const elementosTrayectoria: ElementoTrayectoria[] = trayectoria.map(
+    (elemento) => {
+      const imagen = String(elemento.imagen_url ?? "");
+      const logoValido =
+        imagen.startsWith("http://") ||
+        imagen.startsWith("https://") ||
+        imagen.startsWith("/");
+
+      return {
+        id: elemento.id,
+        tipo: String(elemento.tipo ?? ""),
+        titulo: String(elemento.titulo ?? ""),
+        institucion: String(elemento.institucion ?? ""),
+        descripcion: String(elemento.descripcion ?? ""),
+        logo: logoValido ? imagen : "",
+        fechaInicio: formatearMesYAnio(elemento.fecha_inicio),
+        fechaFin: formatearMesYAnio(elemento.fecha_fin),
+      };
+    }
+  );
 
   return (
     <main className="min-h-screen overflow-hidden bg-[#F7F1E9] text-[#20231F]">
@@ -566,91 +612,45 @@ export default async function Home({
 
       {/* SOBRE MI */}
       <section id="sobre-mi" className="relative overflow-hidden bg-[#F7F1E9] px-6 py-24 text-[#30372B] md:py-28">
-        <style>{`
-          .diploma-modal { opacity: 0; pointer-events: none; transition: opacity 220ms ease; }
-          .diploma-modal:target { opacity: 1; pointer-events: auto; }
-        `}</style>
+        <div className="mx-auto max-w-5xl">
 
-        <div className="mx-auto max-w-6xl">
-          <div className="text-center">
-            <p className="font-serif text-lg italic text-[#B95B32]">Sobre mí</p>
-            <h2 className="mt-3 font-serif text-4xl text-[#30372B] md:text-5xl">Formación y trayectoria</h2>
-            <p className="mx-auto mt-6 max-w-3xl text-base leading-7 text-[#62675B] md:text-lg md:leading-8">
-              Mi formación y experiencia respaldan el acompañamiento profesional. Aquí puedes conocer mis estudios, cursos, diplomados y certificaciones.
-            </p>
+          {/* ENCABEZADO CON FOTO */}
+          <div className="flex flex-col items-center gap-8 text-center md:flex-row md:items-center md:gap-10 md:text-left">
+            <div className="h-[200px] w-[200px] shrink-0 overflow-hidden rounded-[32px] bg-white">
+              {fotoSobreMi ? (
+                <img
+                  src={fotoSobreMi}
+                  alt={`Fotografía de ${nombreProfesional}`}
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center px-4 text-center text-sm font-semibold text-[#59614D]">
+                  Fotografía de {primerNombre}
+                </div>
+              )}
+            </div>
+
+            <div>
+              <p className="font-serif text-lg italic text-[#B95B32]">Sobre mí</p>
+              <h2 className="mt-2 font-serif text-4xl font-bold text-[#20231F] md:text-5xl">Formación y trayectoria</h2>
+              <p className="mt-4 max-w-2xl text-base leading-7 text-[#62675B]">
+                Mi formación y experiencia respaldan el acompañamiento profesional. Aquí puedes conocer mis estudios, cursos, diplomados y certificaciones.
+              </p>
+            </div>
           </div>
 
-          <div className="mt-14 grid gap-5 sm:grid-cols-2">
-            {trayectoria.map((elemento) => {
-              const imagenValida = elemento.imagen_url && (String(elemento.imagen_url).startsWith("http://") || String(elemento.imagen_url).startsWith("https://") || String(elemento.imagen_url).startsWith("/"));
-              const tipo = elemento.tipo === "TITULO" ? "Título" : elemento.tipo === "CURSO" ? "Curso" : elemento.tipo === "DIPLOMADO" ? "Diplomado" : "Certificación";
-              const modalId = `diploma-${elemento.id}`;
-
-              return (
-                <article key={elemento.id} className="overflow-hidden rounded-[24px] border border-[#D6D8CC] bg-[#F7F6F0] text-left transition duration-300 hover:-translate-y-1 hover:bg-white">
-                  <div className="flex flex-col gap-5 p-5 sm:flex-row sm:items-center">
-                    {imagenValida ? (
-                      <a href={`#${modalId}`} className="group relative block shrink-0 overflow-hidden rounded-2xl border border-[#D6D8CC] bg-[#F7F1E9] sm:h-32 sm:w-24" aria-label={`Ver ${tipo}: ${elemento.titulo}`}>
-                        <img src={String(elemento.imagen_url)} alt={`Imagen de ${tipo}: ${elemento.titulo}`} className="h-48 w-full object-cover transition duration-300 group-hover:scale-105 sm:h-full" />
-                        <span className="absolute bottom-2 right-2 flex h-9 w-9 items-center justify-center rounded-full bg-[#3F4635]/90 text-white shadow-lg">↗</span>
-                      </a>
-                    ) : (
-                      <div className="flex h-24 w-20 shrink-0 items-center justify-center rounded-2xl border border-[#D6D8CC] bg-white text-2xl text-[#A6AA9A]">✦</div>
-                    )}
-
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs font-medium uppercase tracking-[0.15em] text-[#B95B32]">{tipo}</p>
-                      <h3 className="mt-2 font-serif text-xl leading-7">{elemento.titulo}</h3>
-                      {elemento.institucion && <p className="mt-1 text-sm text-[#707469]">{elemento.institucion}</p>}
-                      {elemento.descripcion && (
-                        <RichText
-                          value={elemento.descripcion}
-                          className="mt-3 text-sm leading-6 text-[#62675B]"
-                        />
-                      )}
-                      {(elemento.fecha_inicio || elemento.fecha_fin) && (
-                        <p className="mt-3 text-xs text-[#85877D]">
-                          {elemento.fecha_inicio ? new Date(elemento.fecha_inicio).toLocaleDateString("es-CO", { month: "long", year: "numeric" }) : "Sin fecha"}
-                          {" — "}
-                          {elemento.fecha_fin ? new Date(elemento.fecha_fin).toLocaleDateString("es-CO", { month: "long", year: "numeric" }) : "Actualidad"}
-                        </p>
-                      )}
-                      {imagenValida && <a href={`#${modalId}`} className="mt-4 inline-block text-sm font-medium text-[#B95B32] hover:text-[#59614D]">Ver diploma</a>}
-                    </div>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-
-          {trayectoria.length === 0 && (
+          {/* FORMACIÓN */}
+          {elementosTrayectoria.length > 0 ? (
+            <TrayectoriaLista elementos={elementosTrayectoria} />
+          ) : (
             <div className="mx-auto mt-10 max-w-2xl rounded-3xl border border-dashed border-[#C8CBBE] p-8 text-center text-[#707469]">
               Próximamente encontrarás aquí la formación y trayectoria profesional.
             </div>
           )}
 
-          <div className="mt-12 border-t border-[#D6D8CC] pt-8 text-center">
+          <div className="mt-12 text-center">
             <p className="font-serif text-lg italic text-[#62675B]">La formación constante permite ofrecer un acompañamiento más humano y profesional.</p>
           </div>
-
-          {trayectoria.map((elemento) => {
-            const imagenValida = elemento.imagen_url && (String(elemento.imagen_url).startsWith("http://") || String(elemento.imagen_url).startsWith("https://") || String(elemento.imagen_url).startsWith("/"));
-            if (!imagenValida) return null;
-            const modalId = `diploma-${elemento.id}`;
-            return (
-              <div key={modalId} id={modalId} className="diploma-modal fixed inset-0 z-[100] flex items-center justify-center bg-[#1F241B]/80 p-4 backdrop-blur-sm">
-                <a href="#sobre-mi" aria-label="Cerrar diploma" className="absolute inset-0 cursor-default" />
-                <div className="relative z-10 max-h-[92vh] max-w-4xl overflow-hidden rounded-3xl bg-[#F7F1E9] p-3 shadow-2xl sm:p-5">
-                  <a href="#sobre-mi" className="absolute right-5 top-5 z-20 flex h-10 w-10 items-center justify-center rounded-full bg-[#3F4635]/90 text-xl text-white shadow-lg" aria-label="Cerrar">×</a>
-                  <img src={String(elemento.imagen_url)} alt={`Diploma ampliado: ${elemento.titulo}`} className="max-h-[82vh] w-auto max-w-full rounded-2xl object-contain" />
-                  <div className="px-2 pb-1 pt-4 text-center text-[#3F4635]">
-                    <p className="font-serif text-lg">{elemento.titulo}</p>
-                    {elemento.institucion && <p className="mt-1 text-sm text-[#707469]">{elemento.institucion}</p>}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
         </div>
       </section>
 
