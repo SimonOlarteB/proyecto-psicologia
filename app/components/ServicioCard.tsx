@@ -10,6 +10,12 @@ export default function ServicioCard({
   servicio: ServicioPublico;
 }) {
   const esEspecial = servicio.tipo_servicio === "ESPECIAL";
+  const porcentajeDescuento = Number(servicio.porcentaje_descuento) || 0;
+  const precioOriginal = Number(servicio.precio_original) || 0;
+  const esPromocion =
+    servicio.tipo_servicio === "PROMOCION" &&
+    porcentajeDescuento > 0 &&
+    precioOriginal > Number(servicio.precio);
 
   const etiquetaModalidad =
     servicio.modalidad === "VIRTUAL"
@@ -24,9 +30,17 @@ export default function ServicioCard({
   return (
     <article className="flex h-full flex-col rounded-[32px] border border-[#E7E0D7] bg-white p-7 transition duration-300 hover:-translate-y-1 hover:shadow-lg md:p-8">
       {!esEspecial && (
-        <div className="flex items-center gap-2 text-sm font-medium text-[#59614D]">
-          <IconoModalidad className="h-4 w-4" aria-hidden="true" />
-          <span>{etiquetaModalidad}</span>
+        <div className="flex items-center justify-between gap-2 text-sm font-medium text-[#59614D]">
+          <span className="flex items-center gap-2">
+            <IconoModalidad className="h-4 w-4" aria-hidden="true" />
+            <span>{etiquetaModalidad}</span>
+          </span>
+
+          {esPromocion && (
+            <span className="rounded-full bg-[#BC5A32] px-3 py-1 text-xs font-semibold text-white">
+              -{porcentajeDescuento} %
+            </span>
+          )}
         </div>
       )}
 
@@ -55,7 +69,12 @@ export default function ServicioCard({
             Atención personalizada · Cotización previa
           </p>
         ) : (
-          <p className="flex items-baseline gap-2">
+          <p className="flex flex-wrap items-baseline gap-2">
+            {esPromocion && (
+              <span className="text-sm text-[#8A8D84] line-through">
+                ${precioOriginal.toLocaleString("es-CO")}
+              </span>
+            )}
             <span className="text-3xl font-bold text-[#20231F]">
               ${Number(servicio.precio).toLocaleString("es-CO")}
             </span>

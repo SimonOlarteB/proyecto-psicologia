@@ -83,10 +83,18 @@ export default async function Home({
   const restoNombre =
     nombrePartes.slice(1).join(" ") || "Elisa Sánchez";
   const serviciosPersonas = servicios
-    .filter((servicio) => servicio.categoria === "PERSONAS")
+    .filter(
+      (servicio) =>
+        servicio.categoria === "PERSONAS" &&
+        servicio.tipo_servicio !== "PROMOCION"
+    )
     .slice(0, 4);
   const serviciosEmpresas = servicios
-    .filter((servicio) => servicio.categoria === "EMPRESAS")
+    .filter(
+      (servicio) =>
+        servicio.categoria === "EMPRESAS" &&
+        servicio.tipo_servicio !== "PROMOCION"
+    )
     .slice(0, 4);
 
   // Aceptamos tanto URLs externas como rutas locales
@@ -476,11 +484,7 @@ export default async function Home({
           {grupo.categoria === "personas" && promociones.length > 0 && (
             <div className="mt-8 space-y-4">
               {promociones.map((promocion) => (
-                <PromocionCard
-                  key={promocion.id}
-                  promocion={promocion}
-                  whatsappLink={whatsappLink}
-                />
+                <PromocionCard key={promocion.id} promocion={promocion} />
               ))}
             </div>
           )}

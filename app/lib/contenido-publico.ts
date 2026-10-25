@@ -19,9 +19,11 @@ export interface ServicioPublico extends RowDataPacket {
   id: number;
   nombre: string;
   descripcion: string | null;
-  tipo_servicio: "NORMAL" | "ESPECIAL";
+  tipo_servicio: "NORMAL" | "ESPECIAL" | "PROMOCION";
   categoria: CategoriaServicio;
   precio: number;
+  precio_original: number | null;
+  porcentaje_descuento: number | null;
   duracion_minutos: number;
   modalidad: "PRESENCIAL" | "VIRTUAL" | "AMBAS";
   activo: number;
@@ -29,14 +31,14 @@ export interface ServicioPublico extends RowDataPacket {
 
 export interface PromocionPublica extends RowDataPacket {
   id: number;
-  titulo: string;
-  descripcion: string;
-  porcentaje_descuento: number;
-  accion: "COTIZAR" | "AGENDAR";
-  servicio_id: number | null;
-  enlace: string | null;
-  activo: number;
-  orden: number;
+  nombre: string;
+  descripcion: string | null;
+  precio: number;
+  precio_original: number | null;
+  porcentaje_descuento: number | null;
+  duracion_minutos: number;
+  modalidad: "PRESENCIAL" | "VIRTUAL" | "AMBAS";
+  incluye: string | null;
 }
 
 export async function obtenerPerfilPublico() {
@@ -73,6 +75,8 @@ export async function obtenerServiciosPublicos(
       tipo_servicio,
       categoria,
       precio,
+      precio_original,
+      porcentaje_descuento,
       duracion_minutos,
       modalidad,
       activo,
@@ -99,6 +103,8 @@ export async function obtenerServicioPublico(id: number) {
       tipo_servicio,
       categoria,
       precio,
+      precio_original,
+      porcentaje_descuento,
       duracion_minutos,
       modalidad,
       activo
@@ -112,27 +118,34 @@ export async function obtenerServicioPublico(id: number) {
   return filas[0] ?? null;
 }
 
-// Promociones activas para la página de inicio.
-// Si la tabla aún no existe o la consulta falla, devuelve una lista vacía
-// para no afectar el resto de la página.
+// Promociones (servicios de tipo PROMOCION) activas para la página de inicio.
+// Si las columnas nuevas aún no existen o la consulta falla, devuelve una
+// lista vacía para no afectar el resto de la página.
 export async function obtenerPromocionesPublicas(): Promise<
   PromocionPublica[]
 > {
   try {
     const [filas] = await pool.query<PromocionPublica[]>(`
       SELECT
-        id,
-        titulo,
-        descripcion,
-        porcentaje_descuento,
-        accion,
-        servicio_id,
-        enlace,
-        activo,
-        orden
-      FROM promociones
-      WHERE activo = 1
-      ORDER BY orden ASC, id DESC
+        s.id,
+        s.nombre,
+        s.descripcion,
+        s.precio,
+        s.precio_original,
+        s.porcentaje_descuento,
+        s.duracion_minutos,
+        s.modalidad,
+        (
+          SELECT GROUP_CONCAT(inc.nombre ORDER BY inc.nombre SEPARATOR ' + ')
+          FROM servicio_promocion_items i
+          INNER JOIN servicios inc ON inc.id = i.servicio_id
+          WHERE i.promocion_id = s.id
+        ) AS incluye
+      FROM servicios s
+      WHERE s.activo = 1
+        AND s.tipo_servicio = 'PROMOCION'
+        AND s.categoria = 'PERSONAS'
+      ORDER BY s.id DESC
     `);
 
     return filas;

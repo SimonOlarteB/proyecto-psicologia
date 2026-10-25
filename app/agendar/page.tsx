@@ -17,18 +17,13 @@ type Servicio = {
   id: number;
   nombre: string;
   descripcion: string;
-  tipo_servicio: "NORMAL" | "ESPECIAL";
+  tipo_servicio: "NORMAL" | "ESPECIAL" | "PROMOCION";
   precio: number;
+  precio_original: number | null;
+  porcentaje_descuento: number | null;
   duracion_minutos: number;
   modalidad: "PRESENCIAL" | "VIRTUAL" | "AMBAS";
   activo: number;
-};
-
-type PromocionAgenda = {
-  id: number;
-  titulo: string;
-  porcentaje_descuento: number;
-  servicio_id: number | null;
 };
 
 type BloqueoAgenda = {
@@ -75,15 +70,13 @@ type CitaCreada = {
 export default function AgendarPage({
   searchParams,
 }: {
-  searchParams: Promise<{ servicio_id?: string; promocion_id?: string }>;
+  searchParams: Promise<{ servicio_id?: string }>;
 }) {
-  const { servicio_id: servicioInicialId, promocion_id: promocionInicialId } =
-    use(searchParams);
+  const { servicio_id: servicioInicialId } = use(searchParams);
   const [servicios, setServicios] = useState<Servicio[]>([]);
   const [servicioSeleccionado, setServicioSeleccionado] = useState(
     servicioInicialId || ""
   );
-  const [promocion, setPromocion] = useState<PromocionAgenda | null>(null);
   const [modalidad, setModalidad] = useState("");
   const [fecha, setFecha] = useState("");
   const [hora, setHora] = useState("");
@@ -195,61 +188,16 @@ export default function AgendarPage({
     cargarDisponibilidadesEspeciales();
   }, []);
 
-  // Carga la promoción que viene en el enlace (?promocion_id=...)
-  useEffect(() => {
-    if (!promocionInicialId) return;
-
-    const idPromocion = promocionInicialId;
-    let cancelada = false;
-
-    async function cargarPromocion() {
-      try {
-        const respuesta = await fetch(
-          `/api/promociones?id=${encodeURIComponent(idPromocion)}`
-        );
-
-        if (!respuesta.ok) return;
-
-        const datos = await respuesta.json();
-
-        if (!cancelada) {
-          setPromocion(datos);
-        }
-      } catch (error) {
-        console.error("Error cargando la promoción:", error);
-      }
-    }
-
-    void cargarPromocion();
-
-    return () => {
-      cancelada = true;
-    };
-  }, [promocionInicialId]);
-
   const servicioActual = servicios.find(
     (servicio) =>
       String(servicio.id) === servicioSeleccionado
   );
 
-  // El descuento solo aplica al servicio de la promoción.
-  // El valor real a cobrar lo vuelve a calcular el servidor.
-  const promocionAplicable =
-    servicioActual &&
-    promocion &&
-    promocion.servicio_id === servicioActual.id &&
-    promocion.porcentaje_descuento > 0
-      ? promocion
-      : null;
-
-  const precioConDescuento =
-    servicioActual && promocionAplicable
-      ? Math.round(
-          (Number(servicioActual.precio) *
-            (100 - promocionAplicable.porcentaje_descuento)) /
-            100
-        )
-      : null;
+  // Promoción: el precio guardado del servicio ya incluye el descuento.
+  const esPromocion =
+    servicioActual?.tipo_servicio === "PROMOCION" &&
+    Number(servicioActual.porcentaje_descuento) > 0 &&
+    Number(servicioActual.precio_original) > Number(servicioActual.precio);
 
   const duracionServicio = Number(servicioActual?.duracion_minutos) || 60;
   const esServicioPorDias = esDuracionEnDias(duracionServicio);
@@ -698,9 +646,6 @@ export default function AgendarPage({
           servicio_id: Number(
             servicioSeleccionado
           ),
-          ...(promocionAplicable
-            ? { promocion_id: promocionAplicable.id }
-            : {}),
           fecha,
           hora,
           modalidad,
@@ -986,20 +931,23 @@ export default function AgendarPage({
                       )}
                     </span>
 
-                    {precioConDescuento !== null && promocionAplicable ? (
+                    {esPromocion ? (
                       <span className="flex flex-wrap items-center gap-2">
                         <span>💰</span>
                         <span className="line-through opacity-60">
                           $
                           {Number(
-                            servicioActual.precio
+                            servicioActual.precio_original
                           ).toLocaleString("es-CO")}
                         </span>
                         <strong className="text-base text-[#C56835]">
-                          ${precioConDescuento.toLocaleString("es-CO")}
+                          $
+                          {Number(
+                            servicioActual.precio
+                          ).toLocaleString("es-CO")}
                         </strong>
                         <span className="rounded-full bg-[#C56835] px-2 py-0.5 text-xs font-semibold text-white">
-                          -{promocionAplicable.porcentaje_descuento} %
+                          -{Number(servicioActual.porcentaje_descuento)} %
                         </span>
                       </span>
                     ) : (
@@ -1012,9 +960,9 @@ export default function AgendarPage({
                     )}
                   </div>
 
-                  {promocionAplicable && (
+                  {esPromocion && (
                     <p className="mt-3 text-xs text-[#C56835]">
-                      Promoción aplicada: {promocionAplicable.titulo}
+                      Promoción con descuento incluido.
                     </p>
                   )}
                 </div>
