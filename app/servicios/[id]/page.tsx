@@ -61,7 +61,19 @@ export default async function ServicioDetallePage({
             </p>
           )}
 
-          {esCotizable ? (
+
+        {servicio.incluye && (
+          <div className="mt-6 overflow-hidden rounded-xl border border-[#E8C9B8] bg-[#FBF1EA] px-4 py-3">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-[#BC5A32]">
+              Incluye
+            </p>
+            <p className="mt-1 whitespace-pre-line text-sm font-medium leading-6 text-[#2F332B] [overflow-wrap:anywhere]">
+              {servicio.incluye}
+            </p>
+          </div>
+        )}
+
+        {esCotizable ? (
             <div className="mt-8">
               {whatsappLink ? (
                 <a

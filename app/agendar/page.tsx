@@ -24,6 +24,7 @@ type Servicio = {
   duracion_minutos: number;
   modalidad: "PRESENCIAL" | "VIRTUAL" | "AMBAS";
   activo: number;
+  incluye: string | null;
 };
 
 type BloqueoAgenda = {
@@ -922,6 +923,25 @@ export default function AgendarPage({
 className="leading-6 [overflow-wrap:anywhere]"
                   />
                   </div>
+                  <div className="mt-2 text-sm text-[#707469]">
+                <RichText
+                  value={servicioActual.descripcion}
+                  className="leading-6 [overflow-wrap:anywhere]"
+                />
+              </div>
+
+              {servicioActual.incluye && (
+                <div className="mt-3 overflow-hidden rounded-xl border border-[#E8C9B8] bg-[#FBF1EA] px-4 py-2.5">
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-[#BC5A32]">
+                    Incluye
+                  </p>
+                  <p className="mt-0.5 line-clamp-2 text-sm font-medium leading-5 text-[#2F332B] [overflow-wrap:anywhere]">
+                    {servicioActual.incluye}
+                  </p>
+                </div>
+              )}
+
+          
 
                   <div className="mt-3 flex flex-wrap items-center gap-4 text-sm text-[#707469]">
                     <span>
