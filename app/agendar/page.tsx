@@ -911,16 +911,16 @@ export default function AgendarPage({
               {/* INFORMACIÓN DEL SERVICIO */}
 
               {servicioActual && (
-                <div className="mt-4 rounded-2xl bg-[#F7F1E9] p-5">
-                  <h2 className="font-serif text-xl">
+                <div className="mt-4 overflow-hidden rounded-2xl bg-[#F7F1E9] p-5">
+                 <h2 className="font-serif text-xl [overflow-wrap:anywhere]">
                     {servicioActual.nombre}
                   </h2>
 
                   <div className="mt-2 text-sm text-[#707469]">
                     <RichText
                       value={servicioActual.descripcion}
-                      className="leading-6"
-                    />
+className="leading-6 [overflow-wrap:anywhere]"
+                  />
                   </div>
 
                   <div className="mt-3 flex flex-wrap items-center gap-4 text-sm text-[#707469]">
