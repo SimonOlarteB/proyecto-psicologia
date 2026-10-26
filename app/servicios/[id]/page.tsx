@@ -48,14 +48,13 @@ export default async function ServicioDetallePage({
           <p className="text-sm font-medium uppercase tracking-[0.15em] text-[#B95B32]">
             {servicio.categoria === "EMPRESAS" ? "Para empresas" : "Para personas"}
           </p>
-          <h1 className="mt-3 font-serif text-3xl text-[#3F4635] md:text-4xl">
-            {servicio.nombre}
+<h1 className="mt-3 font-serif text-3xl text-[#3F4635] md:text-4xl [overflow-wrap:anywhere]">            {servicio.nombre}
           </h1>
           {servicio.descripcion ? (
-            <RichText
-              value={servicio.descripcion}
-              className="mt-5 text-base leading-7 text-[#707469]"
-            />
+           <RichText
+  value={servicio.descripcion}
+  className="mt-5 text-base leading-7 text-[#707469] [overflow-wrap:anywhere]"
+/>
           ) : (
             <p className="mt-5 text-base leading-7 text-[#707469]">
               Consulta con nosotros los detalles de este servicio.
