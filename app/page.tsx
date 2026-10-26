@@ -306,8 +306,6 @@ export default async function Home({
           {fotoPerfil ? (
             <div className="relative mx-auto w-full max-w-[520px] lg:translate-y-2">
 
-              <div className="absolute left-4 top-0 h-[88%] w-[88%] rounded-full bg-[#E6B991]" />
-
               <div className="relative mx-auto h-[390px] w-[90%] overflow-hidden rounded-t-full rounded-b-[42%] sm:h-[470px] lg:h-[510px]">
 
                 <img
@@ -318,17 +316,7 @@ export default async function Home({
 
               </div>
 
-              <div className="absolute bottom-5 left-0 max-w-[280px] rounded-2xl border border-[#E1DBD2] bg-[#FBF9F5] px-5 py-4 text-[#20231F] shadow-xl sm:bottom-8 sm:-left-4 sm:px-6 sm:py-5">
-
-                <h3 className="font-serif text-xl font-medium">
-                  Encuentra tu centro
-                </h3>
-
-                <p className="mt-2 text-sm leading-6 text-[#62675B]">
-                  Un espacio para tu bienestar emocional y crecimiento personal.
-                </p>
-
-              </div>
+              
 
             </div>
           ) : (
