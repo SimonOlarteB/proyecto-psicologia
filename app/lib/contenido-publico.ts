@@ -27,6 +27,7 @@ export interface ServicioPublico extends RowDataPacket {
   duracion_minutos: number;
   modalidad: "PRESENCIAL" | "VIRTUAL" | "AMBAS";
   activo: number;
+  incluye?: string | null;
 }
 
 export interface PromocionPublica extends RowDataPacket {
@@ -67,53 +68,65 @@ export async function obtenerServiciosPublicos(
   categoria?: CategoriaServicio
 ): Promise<ServicioPublico[]> {
   const [filas] = await pool.query<ServicioPublico[]>(
-    `
-    SELECT
-      id,
-      nombre,
-      descripcion,
-      tipo_servicio,
-      categoria,
-      precio,
-      precio_original,
-      porcentaje_descuento,
-      duracion_minutos,
-      modalidad,
-      activo,
-      creado_en,
-      actualizado_en
-    FROM servicios
-    WHERE activo = 1
-      AND (? IS NULL OR categoria = ?)
-    ORDER BY id DESC
-    `,
-    [categoria ?? null, categoria ?? null]
-  );
+  `
+  SELECT
+    id,
+    nombre,
+    descripcion,
+    tipo_servicio,
+    categoria,
+    precio,
+    precio_original,
+    porcentaje_descuento,
+    duracion_minutos,
+    modalidad,
+    activo,
+    creado_en,
+    actualizado_en,
+    (
+      SELECT GROUP_CONCAT(inc.nombre ORDER BY inc.nombre SEPARATOR ' + ')
+      FROM servicio_promocion_items i
+      INNER JOIN servicios inc ON inc.id = i.servicio_id
+      WHERE i.promocion_id = servicios.id
+    ) AS incluye
+  FROM servicios
+  WHERE activo = 1
+    AND (? IS NULL OR categoria = ?)
+  ORDER BY id DESC
+  `,
+  [categoria ?? null, categoria ?? null]
+);
 
   return filas;
 }
 
 export async function obtenerServicioPublico(id: number) {
-  const [filas] = await pool.query<ServicioPublico[]>(
-    `
-    SELECT
-      id,
-      nombre,
-      descripcion,
-      tipo_servicio,
-      categoria,
-      precio,
-      precio_original,
-      porcentaje_descuento,
-      duracion_minutos,
-      modalidad,
-      activo
-    FROM servicios
-    WHERE id = ? AND activo = 1
-    LIMIT 1
-    `,
-    [id]
-  );
+ const [filas] = await pool.query<ServicioPublico[]>(
+  `
+  SELECT
+    id,
+    nombre,
+    descripcion,
+    tipo_servicio,
+    categoria,
+    precio,
+    precio_original,
+    porcentaje_descuento,
+    duracion_minutos,
+    modalidad,
+    activo,
+    (
+      SELECT GROUP_CONCAT(inc.nombre ORDER BY inc.nombre SEPARATOR ' + ')
+      FROM servicio_promocion_items i
+      INNER JOIN servicios inc ON inc.id = i.servicio_id
+      WHERE i.promocion_id = servicios.id
+    ) AS incluye
+  FROM servicios
+  WHERE id = ? AND activo = 1
+  LIMIT 1
+  `,
+  [id]
+);
 
   return filas[0] ?? null;
 }
