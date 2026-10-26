@@ -54,7 +54,7 @@ function Logo({
   elemento: ElementoTrayectoria;
   grande?: boolean;
 }) {
-  const altura = grande ? "h-14" : "h-10";
+  const altura = grande ? "h-20" : "h-16";
 
   if (elemento.logo) {
     return (
@@ -69,7 +69,7 @@ function Logo({
   return (
     <span
       aria-hidden="true"
-      className={`flex ${altura} ${grande ? "w-14" : "w-10"} items-center justify-center rounded-xl bg-[#F7F1E9] text-lg text-[#A6AA9A]`}
+      className={`flex ${altura} ${grande ? "w-20" : "w-16"} items-center justify-center rounded-xl bg-[#F7F1E9] text-lg text-[#A6AA9A]`}
     >
       ✦
     </span>
@@ -116,19 +116,19 @@ export default function TrayectoriaLista({
               key={elemento.id}
               className="flex h-full flex-col rounded-[24px] bg-white p-5 transition duration-300 hover:-translate-y-1 hover:shadow-lg"
             >
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0 flex-1">
-                  <Logo elemento={elemento} />
-                </div>
-
+              <div className="flex justify-end">
                 <span
-                  className={`shrink-0 rounded-full px-3 py-1 text-[11px] font-semibold ${claseInsignia(elemento.tipo)}`}
+                  className={`rounded-full px-3 py-1 text-[11px] font-semibold ${claseInsignia(elemento.tipo)}`}
                 >
                   {etiquetas.nombre}
                 </span>
               </div>
 
-              <h3 className="mt-5 font-serif text-lg font-bold leading-snug text-[#20231F]">
+              <div className="mt-2 flex h-16 min-w-0 items-center">
+                <Logo elemento={elemento} />
+              </div>
+
+              <h3 className="mt-4 font-serif text-lg font-bold leading-snug text-[#20231F]">
                 {elemento.titulo}
               </h3>
 

@@ -11,6 +11,18 @@ async function obtenerSesionAdmin() {
   return verificarSesion(token);
 }
 
+// Detecta cuando falta la columna en la base de datos (SQL 004 sin ejecutar)
+function esColumnaFaltante(error: unknown) {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    (error as { code?: string }).code === "ER_BAD_FIELD_ERROR"
+  );
+}
+
+const MENSAJE_COLUMNA_FALTANTE =
+  "Falta crear la columna foto_sobre_mi_url en la base de datos. Ejecuta el SQL 004_foto_sobre_mi.sql y vuelve a intentarlo.";
+
 // Obtener la foto actual de "Sobre mí"
 // SOLO ADMINISTRADOR (la página pública la lee directo de la base de datos)
 export async function GET() {
@@ -36,6 +48,13 @@ export async function GET() {
     });
   } catch (error) {
     console.error("Error obteniendo la foto de Sobre mí:", error);
+
+    if (esColumnaFaltante(error)) {
+      return NextResponse.json(
+        { error: MENSAJE_COLUMNA_FALTANTE },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json(
       { error: "No se pudo obtener la fotografía." },
@@ -112,6 +131,13 @@ export async function PUT(request: Request) {
     });
   } catch (error) {
     console.error("Error guardando la foto de Sobre mí:", error);
+
+    if (esColumnaFaltante(error)) {
+      return NextResponse.json(
+        { error: MENSAJE_COLUMNA_FALTANTE },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json(
       { error: "No se pudo guardar la fotografía." },

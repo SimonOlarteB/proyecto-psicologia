@@ -15,37 +15,43 @@ export default function PromocionCard({
   return (
     <article className="flex flex-col gap-5 rounded-2xl border border-dashed border-[#BC5A32] bg-white p-6 sm:flex-row sm:items-center md:px-8 md:py-7">
       {porcentaje > 0 && (
-        <div className="flex shrink-0 items-center justify-center rounded-xl bg-[#BC5A32] px-5 py-3 text-2xl font-bold text-white">
+        <div className="flex shrink-0 items-center justify-center self-start rounded-xl bg-[#BC5A32] px-5 py-3 text-2xl font-bold text-white sm:self-center">
           -{porcentaje} %
         </div>
       )}
 
       <div className="min-w-0 flex-1">
-        <h3 className="text-lg font-semibold leading-snug text-[#20231F]">
+        <h3 className="line-clamp-2 break-words text-xl font-bold leading-snug text-[#20231F]">
           {promocion.nombre}
         </h3>
 
         {promocion.descripcion && (
           <RichText
             value={promocion.descripcion}
-            className="mt-1 text-sm leading-6 text-[#5F6358]"
+            className="mt-2 line-clamp-2 break-words text-base font-medium leading-6 text-[#3F4635]"
           />
         )}
 
         {promocion.incluye && (
-          <p className="mt-2 text-xs text-[#707469]">
-            Incluye: {promocion.incluye}
-          </p>
+          <div className="mt-3 rounded-xl border border-[#E8C9B8] bg-[#FBF1EA] px-4 py-2.5">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-[#BC5A32]">
+              Incluye
+            </p>
+
+            <p className="mt-0.5 line-clamp-2 break-words text-sm font-medium leading-5 text-[#2F3329]">
+              {promocion.incluye}
+            </p>
+          </div>
         )}
 
-        <p className="mt-2 flex flex-wrap items-baseline gap-2">
+        <p className="mt-3 flex flex-wrap items-baseline gap-2">
           {precioOriginal > precioFinal && (
             <span className="text-sm text-[#8A8D84] line-through">
               ${precioOriginal.toLocaleString("es-CO")}
             </span>
           )}
 
-          <span className="text-xl font-bold text-[#20231F]">
+          <span className="text-2xl font-bold text-[#20231F]">
             ${precioFinal.toLocaleString("es-CO")}
           </span>
 
@@ -56,10 +62,10 @@ export default function PromocionCard({
       </div>
 
       <Link
-        href={`/agendar?servicio_id=${promocion.id}`}
+        href={`/servicios/${promocion.id}`}
         className="inline-flex shrink-0 items-center justify-center rounded-full border border-[#59614D] px-6 py-3 text-sm font-medium text-[#3F4635] transition hover:bg-[#59614D] hover:text-white"
       >
-        Agendar
+        Ver servicio
       </Link>
     </article>
   );
