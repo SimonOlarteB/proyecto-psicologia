@@ -185,7 +185,11 @@ export async function obtenerTrayectoriaPublica() {
       actualizado_en
     FROM trayectoria
     WHERE activo = 1
-    ORDER BY orden ASC, fecha_inicio DESC, id DESC
+    ORDER BY
+  orden ASC,
+  FIELD(tipo, 'TITULO', 'DIPLOMADO', 'CERTIFICACION', 'CURSO'),
+  fecha_inicio DESC,
+  id DESC
   `);
 
   return filas;

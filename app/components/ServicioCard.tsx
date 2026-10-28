@@ -4,6 +4,17 @@ import { formatearDuracion } from "../lib/duracion";
 import type { ServicioPublico } from "../lib/contenido-publico";
 import RichText from "./RichText";
 
+function aTextoPlano(html: string) {
+  return html
+    .replace(/<\/(p|li|div|h[1-6])>/gi, " ")
+    .replace(/<br\s*\/?>/gi, " ")
+    .replace(/<[^>]*>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 export default function ServicioCard({
   servicio,
 }: {
@@ -28,7 +39,7 @@ export default function ServicioCard({
     servicio.modalidad === "PRESENCIAL" ? Building2 : Monitor;
 
   return (
-    <article className="flex h-full flex-col rounded-[32px] border border-[#E7E0D7] bg-white p-7 transition duration-300 hover:-translate-y-1 hover:shadow-lg md:p-8">
+    <article className="flex h-full min-h-[420px] flex-col rounded-[32px] border border-[#E7E0D7] bg-white p-7 transition duration-300 hover:-translate-y-1 hover:shadow-lg md:p-8">
       {!esEspecial && (
         <div className="flex items-center justify-between gap-2 text-sm font-medium text-[#59614D]">
           <span className="flex items-center gap-2">
@@ -45,7 +56,7 @@ export default function ServicioCard({
       )}
 
       <h3
-        className={`font-serif text-2xl font-bold leading-snug text-[#20231F] md:text-[28px] ${
+        className={`line-clamp-2 font-serif text-2xl font-bold leading-snug text-[#20231F] md:text-[28px] ${
           esEspecial ? "" : "mt-4"
         }`}
       >
@@ -53,10 +64,9 @@ export default function ServicioCard({
       </h3>
 
       {servicio.descripcion ? (
-        <RichText
-          value={servicio.descripcion}
-          className="mt-4 text-base leading-7 text-[#5F6358]"
-        />
+        <p className="mt-4 line-clamp-4 text-base leading-7 text-[#5F6358]">
+          {aTextoPlano(servicio.descripcion)}
+        </p>
       ) : (
         <p className="mt-4 text-base leading-7 text-[#5F6358]">
           Conoce los detalles de este servicio.

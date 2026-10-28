@@ -458,7 +458,7 @@ export default async function Home({
           </div>
 
           {grupo.servicios.length > 0 ? (
-            <div className="grid gap-6 md:grid-cols-2">
+            <div className="grid auto-rows-fr gap-6 md:grid-cols-2">
               {grupo.servicios.map((servicio) => (
                 <ServicioCard key={servicio.id} servicio={servicio} />
               ))}

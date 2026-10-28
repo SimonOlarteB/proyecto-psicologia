@@ -6,6 +6,7 @@ import RichText from "../../components/RichText";
 import RichTextEditor from "../../components/admin/RichTextEditor";
 
 type TipoFormacion =
+    | "TITULO"
     | "CURSO"
     | "DIPLOMADO"
     | "CERTIFICACION";
@@ -161,7 +162,7 @@ export default function CursosDiplomasPage() {
                 if (!respuestaImagen.ok) {
                     throw new Error(
                         resultadoImagen.error ||
-                            "No se pudo subir la fotografía."
+                        "No se pudo subir la fotografía."
                     );
                 }
 
@@ -188,7 +189,7 @@ export default function CursosDiplomasPage() {
             if (!respuesta.ok) {
                 throw new Error(
                     resultado.error ||
-                        "No se pudo guardar la fotografía."
+                    "No se pudo guardar la fotografía."
                 );
             }
 
@@ -235,12 +236,13 @@ export default function CursosDiplomasPage() {
             if (!respuesta.ok) {
                 throw new Error(
                     datos.error ||
-                        "No se pudo cargar la información."
+                    "No se pudo cargar la información."
                 );
             }
 
             const formacion = datos.filter(
                 (elemento: Trayectoria) =>
+                    elemento.tipo === "TITULO" ||
                     elemento.tipo === "CURSO" ||
                     elemento.tipo === "DIPLOMADO" ||
                     elemento.tipo === "CERTIFICACION"
@@ -288,6 +290,13 @@ export default function CursosDiplomasPage() {
             ),
         [elementos]
     );
+    const titulos = useMemo(
+        () =>
+            elementos.filter(
+                (elemento) => elemento.tipo === "TITULO"
+            ),
+        [elementos]
+    );
 
     function abrirNuevo() {
         setEditando(null);
@@ -303,11 +312,13 @@ export default function CursosDiplomasPage() {
 
         setFormulario({
             tipo:
-                elemento.tipo === "DIPLOMADO"
-                    ? "DIPLOMADO"
-                    : elemento.tipo === "CERTIFICACION"
-                        ? "CERTIFICACION"
-                        : "CURSO",
+                elemento.tipo === "TITULO"
+                    ? "TITULO"
+                    : elemento.tipo === "DIPLOMADO"
+                        ? "DIPLOMADO"
+                        : elemento.tipo === "CERTIFICACION"
+                            ? "CERTIFICACION"
+                            : "CURSO",
             titulo: elemento.titulo || "",
             institucion: elemento.institucion || "",
             descripcion: elemento.descripcion || "",
@@ -382,7 +393,7 @@ export default function CursosDiplomasPage() {
                 if (!respuestaImagen.ok) {
                     throw new Error(
                         resultadoImagen.error ||
-                            "No se pudo subir la imagen."
+                        "No se pudo subir la imagen."
                     );
                 }
 
@@ -425,7 +436,7 @@ export default function CursosDiplomasPage() {
             if (!respuesta.ok) {
                 throw new Error(
                     resultado.error ||
-                        "No se pudo guardar la información."
+                    "No se pudo guardar la información."
                 );
             }
 
@@ -483,7 +494,7 @@ export default function CursosDiplomasPage() {
             if (!respuesta.ok) {
                 throw new Error(
                     resultado.error ||
-                        "No se pudo eliminar el registro."
+                    "No se pudo eliminar el registro."
                 );
             }
 
@@ -510,6 +521,7 @@ export default function CursosDiplomasPage() {
     }
 
     function etiquetaTipo(tipo: string) {
+        if (tipo === "TITULO") return "Título";
         if (tipo === "CURSO") return "Curso";
         if (tipo === "DIPLOMADO") return "Diplomado";
         if (tipo === "CERTIFICACION")
@@ -519,6 +531,10 @@ export default function CursosDiplomasPage() {
     }
 
     function colorTipo(tipo: string) {
+        if (tipo === "TITULO") {
+            return "bg-[#3F4635] text-white";
+        }
+
         if (tipo === "CURSO") {
             return "bg-[#59614D] text-white";
         }
@@ -612,34 +628,34 @@ export default function CursosDiplomasPage() {
 
                                         {(elemento.fecha_inicio ||
                                             elemento.fecha_fin) && (
-                                            <p className="mt-3 text-xs text-[#8A8D84]">
-                                                {elemento.fecha_inicio
-                                                    ? new Date(
-                                                          elemento.fecha_inicio
-                                                      ).toLocaleDateString(
-                                                          "es-CO",
-                                                          {
-                                                              month: "long",
-                                                              year: "numeric",
-                                                          }
-                                                      )
-                                                    : "Sin fecha"}
+                                                <p className="mt-3 text-xs text-[#8A8D84]">
+                                                    {elemento.fecha_inicio
+                                                        ? new Date(
+                                                            elemento.fecha_inicio
+                                                        ).toLocaleDateString(
+                                                            "es-CO",
+                                                            {
+                                                                month: "long",
+                                                                year: "numeric",
+                                                            }
+                                                        )
+                                                        : "Sin fecha"}
 
-                                                {" — "}
+                                                    {" — "}
 
-                                                {elemento.fecha_fin
-                                                    ? new Date(
-                                                          elemento.fecha_fin
-                                                      ).toLocaleDateString(
-                                                          "es-CO",
-                                                          {
-                                                              month: "long",
-                                                              year: "numeric",
-                                                          }
-                                                      )
-                                                    : "Actualidad"}
-                                            </p>
-                                        )}
+                                                    {elemento.fecha_fin
+                                                        ? new Date(
+                                                            elemento.fecha_fin
+                                                        ).toLocaleDateString(
+                                                            "es-CO",
+                                                            {
+                                                                month: "long",
+                                                                year: "numeric",
+                                                            }
+                                                        )
+                                                        : "Actualidad"}
+                                                </p>
+                                            )}
 
                                         {elemento.imagen_url && (
                                             <div className="mt-4 inline-flex rounded-xl border border-[#E1DBD2] bg-white p-3">
@@ -885,6 +901,12 @@ export default function CursosDiplomasPage() {
                         <div className="space-y-6">
 
                             {renderListaFormacion({
+                                titulo: "Títulos",
+                                subtitulo: "Títulos académicos y profesionales.",
+                                items: titulos,
+                            })}
+
+                            {renderListaFormacion({
                                 titulo: "Cursos",
                                 subtitulo: "Cursos y formaciones complementarias.",
                                 items: cursos,
@@ -969,6 +991,9 @@ export default function CursosDiplomasPage() {
                                         }
                                         className="w-full rounded-2xl border border-[#D8D0C5] bg-white px-4 py-3 text-sm outline-none transition focus:border-[#C56835] focus:ring-2 focus:ring-[#C56835]/10"
                                     >
+                                        <option value="TITULO">
+                                            Título
+                                        </option>
 
                                         <option value="CURSO">
                                             Curso
@@ -1308,15 +1333,14 @@ export default function CursosDiplomasPage() {
                             <div className="flex items-start gap-4">
 
                                 <div
-                                    className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-lg ${
-                                        alerta.tipo ===
-                                        "error"
+                                    className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-lg ${alerta.tipo ===
+                                            "error"
                                             ? "bg-red-50 text-red-600"
                                             : "bg-green-50 text-green-600"
-                                    }`}
+                                        }`}
                                 >
                                     {alerta.tipo ===
-                                    "error"
+                                        "error"
                                         ? "!"
                                         : "✓"}
                                 </div>
