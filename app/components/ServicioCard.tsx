@@ -4,8 +4,35 @@ import { formatearDuracion } from "../lib/duracion";
 import type { ServicioPublico } from "../lib/contenido-publico";
 import RichText from "./RichText";
 
-function aTextoPlano(html: string) {
-  return html
+function extraerTextos(nodo: unknown): string[] {
+  if (nodo == null) return [];
+  if (typeof nodo === "string") return [];
+  if (Array.isArray(nodo)) return nodo.flatMap(extraerTextos);
+  if (typeof nodo === "object") {
+    const obj = nodo as Record<string, unknown>;
+    if (typeof obj.text === "string") return [obj.text];
+    return Object.entries(obj)
+      .filter(([clave]) => clave !== "marks" && clave !== "type")
+      .flatMap(([, valor]) => extraerTextos(valor));
+  }
+  return [];
+}
+
+function aTextoPlano(valor: string) {
+  const contenido = valor.trim();
+
+  if (contenido.startsWith("{") || contenido.startsWith("[")) {
+    try {
+      return extraerTextos(JSON.parse(contenido))
+        .join(" ")
+        .replace(/\s+/g, " ")
+        .trim();
+    } catch {
+      // si no es JSON válido, sigue con el método de HTML
+    }
+  }
+
+  return contenido
     .replace(/<\/(p|li|div|h[1-6])>/gi, " ")
     .replace(/<br\s*\/?>/gi, " ")
     .replace(/<[^>]*>/g, "")

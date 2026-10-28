@@ -547,7 +547,7 @@ export default async function Home({
     <div>
       {serviciosEmpresas.length > 0 ? (
         <div className="space-y-4">
-          {serviciosEmpresas.map((servicio, index) => {
+         {serviciosEmpresas.slice(0, 3).map((servicio, index) => {
             const Icono = [Briefcase, Users, GraduationCap][index % 3];
 
             return (
