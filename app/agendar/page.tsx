@@ -9,6 +9,7 @@ import {
   esDuracionEnDias,
   intervalosFechaHoraSeCruzan,
   horariosSeCruzan,
+  generarHorasDisponibles,
   minutosDesdeHora,
   obtenerFechasHabiles,
 } from "../lib/horarios";
@@ -57,6 +58,33 @@ type DisponibilidadEspecial = {
   hora_fin: string | null;
   activo: number;
 };
+
+type HorarioAtencion = Pick<Disponibilidad, "hora_inicio" | "hora_fin">;
+
+function obtenerHorariosParaFecha(
+  fecha: string,
+  disponibilidad: Disponibilidad[],
+  disponibilidadesEspeciales: DisponibilidadEspecial[]
+): HorarioAtencion[] {
+  if (!fecha) return [];
+
+  const horariosEspeciales = disponibilidadesEspeciales.filter(
+    (item) => item.fecha?.slice(0, 10) === fecha
+  );
+
+  if (horariosEspeciales.length > 0) {
+    return horariosEspeciales.filter(
+      (item): item is DisponibilidadEspecial & HorarioAtencion =>
+        Boolean(item.hora_inicio && item.hora_fin)
+    );
+  }
+
+  const diaSemana = new Date(`${fecha}T12:00:00Z`).getUTCDay();
+
+  return disponibilidad.filter(
+    (item) => Number(item.dia_semana) === diaSemana
+  );
+}
 
 type CitaCreada = {
   cita_id: number;
@@ -284,12 +312,45 @@ export default function AgendarPage({
       : [servicioActual.modalidad]
     : [];
 
+  const horariosDelDia = useMemo(
+    () =>
+      obtenerHorariosParaFecha(
+        fecha,
+        disponibilidad,
+        disponibilidadesEspeciales
+      ),
+    [fecha, disponibilidad, disponibilidadesEspeciales]
+  );
+
+  const horasPosibles = useMemo(
+    () =>
+      horariosDelDia.flatMap((horario) =>
+        generarHorasDisponibles(
+          horario.hora_inicio,
+          horario.hora_fin,
+          1
+        )
+      ),
+    [horariosDelDia]
+  );
+
   function obtenerEstadoHora(horaDisponible: string) {
+    if (!/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(horaDisponible)) {
+      return {
+        disponible: false,
+        excedeDisponibilidad: true,
+        motivo: "horario" as const,
+      };
+    }
+
     const duracionValidada = esServicioPorDias ? 60 : duracionServicio;
     const inicioDisponible = minutosDesdeHora(horaDisponible);
     const finServicio = inicioDisponible + duracionValidada;
-    let excedeDisponibilidad =
-      finServicio > minutosDesdeHora(horaFinDisponibilidad);
+    let excedeDisponibilidad = !horariosDelDia.some(
+      (horario) =>
+        inicioDisponible >= minutosDesdeHora(horario.hora_inicio) &&
+        finServicio <= minutosDesdeHora(horario.hora_fin)
+    );
 
     if (esServicioPorDias && fecha) {
       const fechasServicio = obtenerFechasHabiles(fecha, diasServicio);
@@ -306,28 +367,20 @@ export default function AgendarPage({
           : null;
 
       excedeDisponibilidad = fechasServicio.some((fechaServicio) => {
-        const diaSemana = new Date(`${fechaServicio}T12:00:00Z`).getUTCDay();
-        const disponibilidadEspecial = disponibilidadesEspeciales.find(
-          (item) => item.fecha?.slice(0, 10) === fechaServicio
+        const horariosFecha = obtenerHorariosParaFecha(
+          fechaServicio,
+          disponibilidad,
+          disponibilidadesEspeciales
         );
-        const horariosDia = disponibilidadEspecial
-          ? disponibilidadEspecial.hora_inicio && disponibilidadEspecial.hora_fin
-            ? [disponibilidadEspecial]
-            : []
-          : disponibilidad.filter(
-              (item) => Number(item.dia_semana) === diaSemana
-            );
-        const horarioInicioDisponible = horariosDia.some(
+        const horarioInicioDisponible = horariosFecha.some(
           (horario) =>
-            horario.hora_inicio &&
-            horario.hora_fin &&
             inicioDisponible >= minutosDesdeHora(horario.hora_inicio) &&
             inicioDisponible + 60 <= minutosDesdeHora(horario.hora_fin)
         );
         const ocupacion = ocupaciones?.[fechaServicio];
 
         if (
-          horariosDia.length === 0 ||
+          horariosFecha.length === 0 ||
           (fechaServicio === fecha && !horarioInicioDisponible) ||
           !ocupacion ||
           ocupacion.citas.length > 0 ||
@@ -340,19 +393,14 @@ export default function AgendarPage({
       });
     }
 
-    const seCruzaConCita = horasOcupadas.some((cita) => {
-      const inicioCita = minutosDesdeHora(cita.hora);
-
-      return (
-        (inicioCita >= inicioDisponible && inicioCita < finServicio) ||
-        horariosSeCruzan(
-          horaDisponible,
-          duracionValidada,
-          cita.hora,
-          cita.duracion_minutos
-        )
-      );
-    });
+    const seCruzaConCita = horasOcupadas.some((cita) =>
+      horariosSeCruzan(
+        horaDisponible,
+        duracionValidada,
+        cita.hora,
+        cita.duracion_minutos
+      )
+    );
     const inicioIntervalo = `${fecha}T${horaDisponible}`;
     const finIntervalo = agregarMinutosAFechaHora(
       fecha,
@@ -368,35 +416,19 @@ export default function AgendarPage({
       )
     );
 
+    const motivo = excedeDisponibilidad
+      ? "horario"
+      : seCruzaConCita
+        ? "ocupada"
+        : seCruzaConBloqueo
+          ? "bloqueada"
+          : null;
+
     return {
-      disponible: !excedeDisponibilidad && !seCruzaConCita && !seCruzaConBloqueo,
+      disponible: motivo === null,
       excedeDisponibilidad,
+      motivo,
     };
-  }
-
-  function generarHoras(
-    horaInicio: string,
-    horaFin: string
-  ) {
-    const horas: string[] = [];
-
-    let horaActual = Number(
-      horaInicio.split(":")[0]
-    );
-
-    const horaFinal = Number(
-      horaFin.split(":")[0]
-    );
-
-    while (horaActual < horaFinal) {
-      horas.push(
-        `${String(horaActual).padStart(2, "0")}:00`
-      );
-
-      horaActual++;
-    }
-
-    return horas;
   }
 
   function formatearHora(hora24: string) {
@@ -421,79 +453,12 @@ export default function AgendarPage({
     return `${hora12}:${minutos} ${periodo}`;
   }
 
-  const { horasDisponibles, horaFinDisponibilidad } = useMemo(() => {
-    if (!fecha) {
-      return { horasDisponibles: [] as string[], horaFinDisponibilidad: "" };
-    }
-
-    const fechaSeleccionada =
-      new Date(`${fecha}T12:00:00`);
-
-    const diaSemana =
-      fechaSeleccionada.getDay();
-
-    // Buscar si existe una disponibilidad especial
-    // para esta fecha
-    const disponibilidadEspecial =
-      disponibilidadesEspeciales.find(
-        (item) =>
-          item.fecha?.slice(0, 10) === fecha
-      );
-
-    // ==========================================
-    // SI EXISTE FECHA ESPECIAL, TIENE PRIORIDAD
-    // ==========================================
-
-    if (disponibilidadEspecial) {
-      // Si la fecha especial no tiene horario,
-      // significa que ese día no hay disponibilidad.
-      if (
-        !disponibilidadEspecial.hora_inicio ||
-        !disponibilidadEspecial.hora_fin
-      ) {
-        return { horasDisponibles: [] as string[], horaFinDisponibilidad: "" };
-      }
-
-      return {
-        horasDisponibles: generarHoras(
-          disponibilidadEspecial.hora_inicio,
-          disponibilidadEspecial.hora_fin
-        ),
-        horaFinDisponibilidad: disponibilidadEspecial.hora_fin,
-      };
-    }
-
-    // ==========================================
-    // SI NO HAY FECHA ESPECIAL,
-    // USAR DISPONIBILIDAD SEMANAL
-    // ==========================================
-
-    const disponibilidadDia =
-      disponibilidad.find(
-        (item) =>
-          Number(item.dia_semana) === diaSemana
-      );
-
-    if (!disponibilidadDia) {
-      return { horasDisponibles: [] as string[], horaFinDisponibilidad: "" };
-    }
-
-    return {
-      horasDisponibles: generarHoras(
-        disponibilidadDia.hora_inicio,
-        disponibilidadDia.hora_fin
-      ),
-      horaFinDisponibilidad: disponibilidadDia.hora_fin,
-    };
-  }, [
-    fecha,
-    disponibilidad,
-    disponibilidadesEspeciales,
-  ]);
-
-  const hayHoraDisponible = horasDisponibles.some(
+  const hayHoraDisponible = horasPosibles.some(
     (horaDisponible) => obtenerEstadoHora(horaDisponible).disponible
   );
+  const estadoHoraSeleccionada = hora
+    ? obtenerEstadoHora(hora)
+    : null;
 
   useEffect(() => {
     if (!fecha || !servicioActual || hayHoraDisponible) return;
@@ -534,10 +499,9 @@ export default function AgendarPage({
     servicioActual?.id,
     servicioActual?.duracion_minutos,
     hayHoraDisponible,
-    horasDisponibles,
+    horasPosibles,
     horasOcupadas,
     bloqueosAgenda,
-    horaFinDisponibilidad,
   ]);
 
   async function cargarFecha(nuevaFecha: string) {
@@ -607,6 +571,20 @@ export default function AgendarPage({
         "advertencia",
         "Falta seleccionar la hora",
         "Selecciona una hora para continuar."
+      );
+      return;
+    }
+
+    const estadoHora = obtenerEstadoHora(hora);
+    if (!estadoHora.disponible) {
+      mostrarMensaje(
+        "advertencia",
+        "Hora no disponible",
+        estadoHora.motivo === "ocupada"
+          ? "Ese horario se cruza con otra cita. Elige otra hora."
+          : estadoHora.motivo === "bloqueada"
+            ? "Ese horario está bloqueado. Elige otra hora."
+            : "El servicio debe terminar dentro del horario de atención."
       );
       return;
     }
@@ -1122,54 +1100,35 @@ className="leading-6 [overflow-wrap:anywhere]"
                     Hora
                   </label>
 
-                  <select
+                  <input
+                    type="time"
+                    step={60}
                     value={hora}
-                    onChange={(e) =>
-                      setHora(e.target.value)
-                    }
+                    onChange={(e) => setHora(e.target.value)}
                     disabled={!fecha}
-                    className="box-border block w-full min-w-0 rounded-xl border border-[#D8D0C5] bg-white px-4 py-3 outline-none focus:border-[#C56835] disabled:bg-[#F7F1E9] disabled:text-[#999]"
-                  >
-                    <option value="">
-                      {fecha
-                        ? hayHoraDisponible
-                          ? "Selecciona una hora"
-                          : "No hay horarios disponibles"
-                        : "Primero selecciona una fecha"}
-                    </option>
-
-                    {horasDisponibles.map(
-                      (horaDisponible) => {
-                        const estadoHora = obtenerEstadoHora(horaDisponible);
-
-                        if (!estadoHora.disponible) {
-                          return (
-                            <option
-                              key={horaDisponible}
-                              value={horaDisponible}
-                              disabled
-                            >
-                              {formatearHora(
-                                horaDisponible
-                              )}{" "}
-                              — {estadoHora.excedeDisponibilidad ? "Fuera del horario" : "Ocupada"} 🔒
-                            </option>
-                          );
-                        }
-
-                        return (
-                          <option
-                            key={horaDisponible}
-                            value={horaDisponible}
-                          >
-                            {formatearHora(
-                              horaDisponible
-                            )}
-                          </option>
-                        );
-                      }
+                    aria-invalid={Boolean(
+                      hora && !estadoHoraSeleccionada?.disponible
                     )}
-                  </select>
+                    aria-describedby={
+                      hora && !estadoHoraSeleccionada?.disponible
+                        ? "estado-hora"
+                        : undefined
+                    }
+                    className="date-input box-border block w-full min-w-0 rounded-xl border border-[#D8D0C5] bg-white px-4 py-3 outline-none focus:border-[#C56835] disabled:bg-[#F7F1E9] disabled:text-[#999]"
+                  />
+                  {hora && estadoHoraSeleccionada && !estadoHoraSeleccionada.disponible && (
+                    <p
+                      id="estado-hora"
+                      className="mt-2 text-sm text-red-600"
+                      role="status"
+                    >
+                      {estadoHoraSeleccionada.motivo === "ocupada"
+                        ? "Esta hora se cruza con otra cita. Prueba con otra."
+                        : estadoHoraSeleccionada.motivo === "bloqueada"
+                          ? "Esta hora está bloqueada. Prueba con otra."
+                          : "El servicio debe terminar dentro del horario de atención."}
+                    </p>
+                  )}
                 </div>
               </div>
 

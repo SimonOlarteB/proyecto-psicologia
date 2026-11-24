@@ -10,6 +10,7 @@
 //
 import {
   agregarMinutosAFechaHora,
+  generarHorasDisponibles,
   intervalosFechaHoraSeCruzan,
   horariosSeCruzan,
   minutosDesdeHora,
@@ -35,8 +36,8 @@ type DisponibilidadSemanal = {
 
 type DisponibilidadEspecial = {
   fecha: string;
-  hora_inicio?: string;
-  hora_fin?: string;
+  hora_inicio?: string | null;
+  hora_fin?: string | null;
 };
 
 type CitaAgenda = {
@@ -46,16 +47,7 @@ type CitaAgenda = {
 };
  
 function generarHoras(horaInicio: string, horaFin: string): string[] {
-  const horas: string[] = [];
-  let actual = Number(horaInicio.split(":")[0]);
-  const final = Number(horaFin.split(":")[0]);
- 
-  while (actual < final) {
-    horas.push(`${String(actual).padStart(2, "0")}:00`);
-    actual++;
-  }
- 
-  return horas;
+  return generarHorasDisponibles(horaInicio, horaFin, 1);
 }
  
 async function leerJson(url: string): Promise<unknown> {
@@ -94,38 +86,40 @@ export async function obtenerHorasDisponibles(
   const listaBloqueos: { inicio: string; fin: string }[] =
     Array.isArray(bloqueos) ? bloqueos : [];
  
-  const diaSemana = new Date(`${fecha}T12:00:00`).getDay();
- 
-  let horas: string[] = [];
-  let horaFin = "";
- 
-  const especial = listaEspeciales.find(
+  const diaSemana = new Date(`${fecha}T12:00:00Z`).getUTCDay();
+  const horariosEspeciales = listaEspeciales.filter(
     (item) => String(item.fecha ?? "").slice(0, 10) === fecha
   );
- 
-  if (especial) {
-    if (especial.hora_inicio && especial.hora_fin) {
-      horas = generarHoras(especial.hora_inicio, especial.hora_fin);
-      horaFin = especial.hora_fin;
-    }
-  } else {
-    const dia = listaSemanal.find(
-      (item) => Number(item.dia_semana) === diaSemana
-    );
- 
-    if (dia) {
-      horas = generarHoras(dia.hora_inicio, dia.hora_fin);
-      horaFin = dia.hora_fin;
-    }
-  }
- 
+  const horarios = horariosEspeciales.length > 0
+    ? horariosEspeciales.flatMap((item) =>
+        item.hora_inicio && item.hora_fin
+          ? [{ hora_inicio: item.hora_inicio, hora_fin: item.hora_fin }]
+          : []
+      )
+    : listaSemanal
+        .filter((item) => Number(item.dia_semana) === diaSemana)
+        .map((item) => ({
+          hora_inicio: item.hora_inicio,
+          hora_fin: item.hora_fin,
+        }));
   const duracionMinutos = Number(contexto.duracionMinutos) || 60;
+  const horas = [
+    ...new Set(
+      horarios.flatMap((horario) =>
+        generarHoras(horario.hora_inicio, horario.hora_fin)
+      )
+    ),
+  ];
  
   return horas.filter((hora) => {
-    if (
-      minutosDesdeHora(hora) + duracionMinutos >
-      minutosDesdeHora(horaFin)
-    ) {
+    const dentroDelHorario = horarios.some(
+      (horario) =>
+        minutosDesdeHora(hora) >= minutosDesdeHora(horario.hora_inicio) &&
+        minutosDesdeHora(hora) + duracionMinutos <=
+          minutosDesdeHora(horario.hora_fin)
+    );
+
+    if (!dentroDelHorario) {
       return false;
     }
 

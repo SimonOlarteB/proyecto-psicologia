@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import AdminNav from "../components/AdminNav";
+import { generarHorasDisponibles } from "../lib/horarios";
 
 type DisponibilidadSemanal = {
     dia_semana: number;
@@ -332,16 +333,7 @@ export default function AdminPage() {
     }
 
     function generarHoras(horaInicio: string, horaFin: string) {
-        const horas: string[] = [];
-        let horaActual = Number(horaInicio.split(":")[0]);
-        const horaFinal = Number(horaFin.split(":")[0]);
-
-        while (horaActual < horaFinal) {
-            horas.push(`${String(horaActual).padStart(2, "0")}:00`);
-            horaActual++;
-        }
-
-        return horas;
+        return generarHorasDisponibles(horaInicio, horaFin, 1);
     }
 
     // ================================
@@ -393,31 +385,27 @@ export default function AdminPage() {
                 CitaOcupada[],
             ];
 
-            const fechaEspecial = especiales.find(
+            const horariosEspeciales = especiales.filter(
                 (item) => item.fecha.slice(0, 10) === fecha
             );
 
-            let horas: string[] = [];
+            let horas: string[];
 
-            if (fechaEspecial) {
-                if (fechaEspecial.hora_inicio && fechaEspecial.hora_fin) {
-                    horas = generarHoras(
-                        fechaEspecial.hora_inicio,
-                        fechaEspecial.hora_fin
-                    );
-                }
+            if (horariosEspeciales.length > 0) {
+                horas = horariosEspeciales.flatMap((horario) =>
+                    horario.hora_inicio && horario.hora_fin
+                        ? generarHoras(horario.hora_inicio, horario.hora_fin)
+                        : []
+                );
             } else {
                 const diaSemana = new Date(`${fecha}T12:00:00`).getDay();
-                const disponibilidadDia = semanal.find(
+                const horariosDia = semanal.filter(
                     (item) => Number(item.dia_semana) === diaSemana
                 );
 
-                if (disponibilidadDia) {
-                    horas = generarHoras(
-                        disponibilidadDia.hora_inicio,
-                        disponibilidadDia.hora_fin
-                    );
-                }
+                horas = horariosDia.flatMap((horario) =>
+                    generarHoras(horario.hora_inicio, horario.hora_fin)
+                );
             }
 
             const ocupadas = citasDelDia.map((cita) =>
@@ -476,6 +464,26 @@ export default function AdminPage() {
         }
 
         const horaFinal = nuevaHora;
+
+        if (!horasDisponibles.includes(horaFinal)) {
+            setDatosAlerta({
+                tipo: "advertencia",
+                titulo: "Hora fuera de disponibilidad",
+                mensaje: "Elige una hora dentro del horario de atención.",
+            });
+            setMostrarAlerta(true);
+            return;
+        }
+
+        if (horasOcupadas.includes(horaFinal)) {
+            setDatosAlerta({
+                tipo: "advertencia",
+                titulo: "Horario ocupado",
+                mensaje: "Ya existe una cita que inicia a esa hora.",
+            });
+            setMostrarAlerta(true);
+            return;
+        }
 
         setProcesandoReprogramacion(true);
 
@@ -1291,42 +1299,33 @@ export default function AdminPage() {
                                         Nueva hora
                                     </label>
 
-                                    <select
+                                    <input
+                                        type="time"
+                                        step={60}
                                         value={nuevaHora}
                                         onChange={(e) => setNuevaHora(e.target.value)}
                                         disabled={
                                             !nuevaFecha ||
                                             cargandoDisponibilidad ||
-                                            procesandoReprogramacion
+                                            procesandoReprogramacion ||
+                                            horasDisponibles.length === 0
                                         }
                                         className="w-full rounded-2xl border border-[#D8D0C5] bg-white px-4 py-3 text-sm text-[#3F4635] outline-none transition focus:border-[#C56835] disabled:bg-[#F7F1E9] disabled:text-[#999]"
-                                    >
-                                        <option value="">
-                                            {cargandoDisponibilidad
-                                                ? "Consultando disponibilidad..."
-                                                : !nuevaFecha
-                                                    ? "Primero selecciona una fecha"
-                                                    : horasDisponibles.length
-                                                        ? "Selecciona una hora"
-                                                        : "No hay horarios disponibles"}
-                                        </option>
-                                        {horasDisponibles.map((hora) => (
-                                            <option
-                                                key={hora}
-                                                value={hora}
-                                                disabled={horasOcupadas.includes(hora)}
-                                            >
-                                                {formatearHora(hora)}
-                                                {horasOcupadas.includes(hora)
-                                                    ? " — Ocupada 🔒"
-                                                    : ""}
-                                            </option>
-                                        ))}
-                                    </select>
+                                    />
 
                                     {errorDisponibilidad && (
                                         <p className="mt-2 text-xs text-red-600">
                                             {errorDisponibilidad}
+                                        </p>
+                                    )}
+                                    {nuevaHora && !horasDisponibles.includes(nuevaHora) && (
+                                        <p className="mt-2 text-xs text-red-600" role="status">
+                                            Selecciona una hora dentro del horario de atención.
+                                        </p>
+                                    )}
+                                    {nuevaHora && horasOcupadas.includes(nuevaHora) && (
+                                        <p className="mt-2 text-xs text-red-600" role="status">
+                                            Ya existe una cita que inicia a esa hora.
                                         </p>
                                     )}
 

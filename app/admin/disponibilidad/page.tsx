@@ -28,15 +28,11 @@ interface BloqueoAgenda {
 interface SeleccionFechaHora {
   fecha: string;
   hora: string;
-  minuto: string;
-  periodo: "AM" | "PM";
 }
 
 const seleccionFechaHoraInicial: SeleccionFechaHora = {
   fecha: "",
-  hora: "12",
-  minuto: "00",
-  periodo: "AM",
+  hora: "00:00",
 };
 
 const diasSemana = [
@@ -503,10 +499,7 @@ function abrirNuevoBloqueo() {
 }
 
 function convertirFechaHoraA24Horas(seleccion: SeleccionFechaHora) {
-  const hora12 = Number(seleccion.hora) % 12;
-  const hora24 = hora12 + (seleccion.periodo === "PM" ? 12 : 0);
-
-  return `${seleccion.fecha}T${String(hora24).padStart(2, "0")}:${seleccion.minuto}`;
+  return `${seleccion.fecha}T${seleccion.hora}`;
 }
 
 async function guardarBloqueoAgenda() {
@@ -715,26 +708,13 @@ function formatearFechaHoraLocal(valor: string) {
     Hora de inicio
   </label>
 
-  <select
+  <input
+    type="time"
+    step={60}
     value={horaInicio}
     onChange={(e) => setHoraInicio(e.target.value)}
     className="w-full rounded-xl border border-[#D8D2C9] bg-white px-4 py-3 text-sm text-[#3F4635] outline-none focus:border-[#C56835]"
-  >
-    <option value="">Selecciona una hora</option>
-    <option value="08:00">8:00 AM</option>
-    <option value="09:00">9:00 AM</option>
-    <option value="10:00">10:00 AM</option>
-    <option value="11:00">11:00 AM</option>
-    <option value="12:00">12:00 PM</option>
-    <option value="13:00">1:00 PM</option>
-    <option value="14:00">2:00 PM</option>
-    <option value="15:00">3:00 PM</option>
-    <option value="16:00">4:00 PM</option>
-    <option value="17:00">5:00 PM</option>
-    <option value="18:00">6:00 PM</option>
-    <option value="19:00">7:00 PM</option>
-    <option value="20:00">8:00 PM</option>
-  </select>
+  />
 </div>
 
 {/* HORA FIN */}
@@ -744,26 +724,13 @@ function formatearFechaHoraLocal(valor: string) {
     Hora de fin
   </label>
 
-  <select
+  <input
+    type="time"
+    step={60}
     value={horaFin}
     onChange={(e) => setHoraFin(e.target.value)}
     className="w-full rounded-xl border border-[#D8D2C9] bg-white px-4 py-3 text-sm text-[#3F4635] outline-none focus:border-[#C56835]"
-  >
-    <option value="">Selecciona una hora</option>
-    <option value="08:00">8:00 AM</option>
-    <option value="09:00">9:00 AM</option>
-    <option value="10:00">10:00 AM</option>
-    <option value="11:00">11:00 AM</option>
-    <option value="12:00">12:00 PM</option>
-    <option value="13:00">1:00 PM</option>
-    <option value="14:00">2:00 PM</option>
-    <option value="15:00">3:00 PM</option>
-    <option value="16:00">4:00 PM</option>
-    <option value="17:00">5:00 PM</option>
-    <option value="18:00">6:00 PM</option>
-    <option value="19:00">7:00 PM</option>
-    <option value="20:00">8:00 PM</option>
-  </select>
+  />
 </div>
             </div>
 
@@ -984,31 +951,15 @@ function formatearFechaHoraLocal(valor: string) {
             Hora de inicio
           </label>
 
-          <select
+          <input
+            type="time"
+            step={60}
             value={horaInicioEspecial}
             onChange={(e) =>
               setHoraInicioEspecial(e.target.value)
             }
             className="w-full rounded-xl border border-[#D8D2C9] bg-white px-4 py-3 text-sm text-[#3F4635] outline-none focus:border-[#C56835]"
-          >
-            <option value="">
-              Selecciona una hora
-            </option>
-
-            <option value="08:00">8:00 AM</option>
-            <option value="09:00">9:00 AM</option>
-            <option value="10:00">10:00 AM</option>
-            <option value="11:00">11:00 AM</option>
-            <option value="12:00">12:00 PM</option>
-            <option value="13:00">1:00 PM</option>
-            <option value="14:00">2:00 PM</option>
-            <option value="15:00">3:00 PM</option>
-            <option value="16:00">4:00 PM</option>
-            <option value="17:00">5:00 PM</option>
-            <option value="18:00">6:00 PM</option>
-            <option value="19:00">7:00 PM</option>
-            <option value="20:00">8:00 PM</option>
-          </select>
+          />
         </div>
 
         {/* HORA FIN */}
@@ -1018,31 +969,15 @@ function formatearFechaHoraLocal(valor: string) {
             Hora de fin
           </label>
 
-          <select
+          <input
+            type="time"
+            step={60}
             value={horaFinEspecial}
             onChange={(e) =>
               setHoraFinEspecial(e.target.value)
             }
             className="w-full rounded-xl border border-[#D8D2C9] bg-white px-4 py-3 text-sm text-[#3F4635] outline-none focus:border-[#C56835]"
-          >
-            <option value="">
-              Selecciona una hora
-            </option>
-
-            <option value="08:00">8:00 AM</option>
-            <option value="09:00">9:00 AM</option>
-            <option value="10:00">10:00 AM</option>
-            <option value="11:00">11:00 AM</option>
-            <option value="12:00">12:00 PM</option>
-            <option value="13:00">1:00 PM</option>
-            <option value="14:00">2:00 PM</option>
-            <option value="15:00">3:00 PM</option>
-            <option value="16:00">4:00 PM</option>
-            <option value="17:00">5:00 PM</option>
-            <option value="18:00">6:00 PM</option>
-            <option value="19:00">7:00 PM</option>
-            <option value="20:00">8:00 PM</option>
-          </select>
+          />
         </div>
 
       </div>
@@ -1207,43 +1142,18 @@ function formatearFechaHoraLocal(valor: string) {
                   <label className="mb-2 mt-4 block text-sm font-medium text-[#3F4635]">
                     Hora de inicio
                   </label>
-                  <div className="grid grid-cols-3 gap-2">
-                    <select
-                      aria-label="Hora de inicio"
-                      value={inicioBloqueo.hora}
-                      onChange={(e) =>
-                        setInicioBloqueo((actual) => ({ ...actual, hora: e.target.value }))
-                      }
-                      className="w-full rounded-xl border border-[#D8D2C9] bg-white px-3 py-3 text-sm text-[#3F4635]"
-                    >
-                      {Array.from({ length: 12 }, (_, index) => String(index + 1)).map((hora) => (
-                        <option key={hora} value={hora}>{hora}</option>
-                      ))}
-                    </select>
-                    <select
-                      aria-label="Minutos de inicio"
-                      value={inicioBloqueo.minuto}
-                      onChange={(e) =>
-                        setInicioBloqueo((actual) => ({ ...actual, minuto: e.target.value }))
-                      }
-                      className="w-full rounded-xl border border-[#D8D2C9] bg-white px-3 py-3 text-sm text-[#3F4635]"
-                    >
-                      {Array.from({ length: 60 }, (_, minuto) => String(minuto).padStart(2, "0")).map((minuto) => (
-                        <option key={minuto} value={minuto}>{minuto}</option>
-                      ))}
-                    </select>
-                    <select
-                      aria-label="AM o PM para inicio"
-                      value={inicioBloqueo.periodo}
-                      onChange={(e) =>
-                        setInicioBloqueo((actual) => ({ ...actual, periodo: e.target.value as "AM" | "PM" }))
-                      }
-                      className="w-full rounded-xl border border-[#D8D2C9] bg-white px-3 py-3 text-sm text-[#3F4635]"
-                    >
-                      <option value="AM">AM</option>
-                      <option value="PM">PM</option>
-                    </select>
-                  </div>
+                  <input
+                    type="time"
+                    step={60}
+                    value={inicioBloqueo.hora}
+                    onChange={(e) =>
+                      setInicioBloqueo((actual) => ({
+                        ...actual,
+                        hora: e.target.value,
+                      }))
+                    }
+                    className="w-full rounded-xl border border-[#D8D2C9] bg-white px-4 py-3 text-sm text-[#3F4635] outline-none focus:border-[#C56835]"
+                  />
                 </div>
                 <div>
                   <label className="mb-2 block text-sm font-medium text-[#3F4635]">
@@ -1261,43 +1171,18 @@ function formatearFechaHoraLocal(valor: string) {
                   <label className="mb-2 mt-4 block text-sm font-medium text-[#3F4635]">
                     Hora final
                   </label>
-                  <div className="grid grid-cols-3 gap-2">
-                    <select
-                      aria-label="Hora final"
-                      value={finBloqueo.hora}
-                      onChange={(e) =>
-                        setFinBloqueo((actual) => ({ ...actual, hora: e.target.value }))
-                      }
-                      className="w-full rounded-xl border border-[#D8D2C9] bg-white px-3 py-3 text-sm text-[#3F4635]"
-                    >
-                      {Array.from({ length: 12 }, (_, index) => String(index + 1)).map((hora) => (
-                        <option key={hora} value={hora}>{hora}</option>
-                      ))}
-                    </select>
-                    <select
-                      aria-label="Minutos finales"
-                      value={finBloqueo.minuto}
-                      onChange={(e) =>
-                        setFinBloqueo((actual) => ({ ...actual, minuto: e.target.value }))
-                      }
-                      className="w-full rounded-xl border border-[#D8D2C9] bg-white px-3 py-3 text-sm text-[#3F4635]"
-                    >
-                      {Array.from({ length: 60 }, (_, minuto) => String(minuto).padStart(2, "0")).map((minuto) => (
-                        <option key={minuto} value={minuto}>{minuto}</option>
-                      ))}
-                    </select>
-                    <select
-                      aria-label="AM o PM para fin"
-                      value={finBloqueo.periodo}
-                      onChange={(e) =>
-                        setFinBloqueo((actual) => ({ ...actual, periodo: e.target.value as "AM" | "PM" }))
-                      }
-                      className="w-full rounded-xl border border-[#D8D2C9] bg-white px-3 py-3 text-sm text-[#3F4635]"
-                    >
-                      <option value="AM">AM</option>
-                      <option value="PM">PM</option>
-                    </select>
-                  </div>
+                  <input
+                    type="time"
+                    step={60}
+                    value={finBloqueo.hora}
+                    onChange={(e) =>
+                      setFinBloqueo((actual) => ({
+                        ...actual,
+                        hora: e.target.value,
+                      }))
+                    }
+                    className="w-full rounded-xl border border-[#D8D2C9] bg-white px-4 py-3 text-sm text-[#3F4635] outline-none focus:border-[#C56835]"
+                  />
                 </div>
               </div>
               <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">

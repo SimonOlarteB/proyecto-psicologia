@@ -3,6 +3,37 @@ export function minutosDesdeHora(hora: string): number {
   return horas * 60 + minutos;
 }
 
+export function generarHorasDisponibles(
+  horaInicio: string,
+  horaFin: string,
+  intervaloMinutos = 30
+): string[] {
+  if (
+    !Number.isInteger(intervaloMinutos) ||
+    intervaloMinutos <= 0
+  ) {
+    return [];
+  }
+
+  const inicio = minutosDesdeHora(horaInicio);
+  const fin = minutosDesdeHora(horaFin);
+  const horas: string[] = [];
+
+  for (
+    let minutosActuales = inicio;
+    minutosActuales < fin;
+    minutosActuales += intervaloMinutos
+  ) {
+    const hora = Math.floor(minutosActuales / 60);
+    const minutos = minutosActuales % 60;
+    horas.push(
+      `${String(hora).padStart(2, "0")}:${String(minutos).padStart(2, "0")}`
+    );
+  }
+
+  return horas;
+}
+
 export function esDuracionEnDias(duracionMinutos: number): boolean {
   return duracionMinutos >= 1440 && duracionMinutos % 1440 === 0;
 }

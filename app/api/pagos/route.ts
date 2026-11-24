@@ -10,6 +10,7 @@ import {
   citaOcupaFecha,
   esDuracionEnDias,
   horariosSeCruzan,
+  minutosDesdeHora,
   obtenerFechasHabiles,
 } from "./../../lib/horarios";
 import {
@@ -21,6 +22,18 @@ type CitaOcupada = RowDataPacket & {
   fecha: string;
   hora: string;
   duracion_minutos: number;
+};
+
+type HorarioDisponible = RowDataPacket & {
+  dia_semana: number;
+  hora_inicio: string;
+  hora_fin: string;
+};
+
+type HorarioEspecial = RowDataPacket & {
+  fecha: string;
+  hora_inicio: string | null;
+  hora_fin: string | null;
 };
 
 async function obtenerSesionAdmin() {
@@ -186,6 +199,16 @@ export async function POST(request: Request) {
       );
     }
 
+    if (
+      typeof hora !== "string" ||
+      !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(hora)
+    ) {
+      return NextResponse.json(
+        { error: "La hora seleccionada no es válida." },
+        { status: 400 }
+      );
+    }
+
     if (!["PRESENCIAL", "VIRTUAL"].includes(modalidad)) {
       return NextResponse.json(
         {
@@ -292,11 +315,81 @@ export async function POST(request: Request) {
       );
     }
 
+    const ultimaFechaServicio = fechasServicio[fechasServicio.length - 1];
+    const [horariosSemanales, horariosEspeciales] = await Promise.all([
+      conexion.query<HorarioDisponible[]>(
+        `
+        SELECT dia_semana,
+          TIME_FORMAT(hora_inicio, '%H:%i') AS hora_inicio,
+          TIME_FORMAT(hora_fin, '%H:%i') AS hora_fin
+        FROM disponibilidad
+        WHERE activo = 1
+        `
+      ),
+      conexion.query<HorarioEspecial[]>(
+        `
+        SELECT DATE_FORMAT(fecha, '%Y-%m-%d') AS fecha,
+          TIME_FORMAT(hora_inicio, '%H:%i') AS hora_inicio,
+          TIME_FORMAT(hora_fin, '%H:%i') AS hora_fin
+        FROM disponibilidad_especial
+        WHERE activo = 1 AND fecha >= ? AND fecha <= ?
+        `,
+        [fecha, ultimaFechaServicio]
+      ),
+    ]);
+
+    const obtenerHorariosDeFecha = (fechaConsulta: string) => {
+      const horariosDelDiaEspecial = horariosEspeciales[0].filter(
+        (horario) => horario.fecha === fechaConsulta
+      );
+
+      if (horariosDelDiaEspecial.length > 0) {
+        return horariosDelDiaEspecial.filter(
+          (
+            horario
+          ): horario is HorarioEspecial & {
+            hora_inicio: string;
+            hora_fin: string;
+          } => Boolean(horario.hora_inicio && horario.hora_fin)
+        );
+      }
+
+      const diaSemana = new Date(`${fechaConsulta}T12:00:00Z`).getUTCDay();
+      return horariosSemanales[0].filter(
+        (horario) => Number(horario.dia_semana) === diaSemana
+      );
+    };
+
+    const inicioMinutos = minutosDesdeHora(hora);
+    const duracionParaHorario = servicioPorDias ? 60 : duracionServicio;
+    const horarioPermitido = fechasServicio.every((fechaServicio) => {
+      const horariosDelDia = obtenerHorariosDeFecha(fechaServicio);
+
+      if (horariosDelDia.length === 0) return false;
+      if (fechaServicio !== fecha) return true;
+
+      const finMinutos = inicioMinutos + duracionParaHorario;
+      return horariosDelDia.some(
+        (horario) =>
+          inicioMinutos >= minutosDesdeHora(horario.hora_inicio) &&
+          finMinutos <= minutosDesdeHora(horario.hora_fin)
+      );
+    });
+
+    if (!horarioPermitido) {
+      return NextResponse.json(
+        {
+          error:
+            "La hora seleccionada no cabe en el horario de atención disponible.",
+        },
+        { status: 409 }
+      );
+    }
+
     // ====================================================
     // VALIDAR HORARIO
     // ====================================================
 
-    const ultimaFechaServicio = fechasServicio[fechasServicio.length - 1];
     const [citasExistentes] =
       await conexion.query<CitaOcupada[]>(
         `

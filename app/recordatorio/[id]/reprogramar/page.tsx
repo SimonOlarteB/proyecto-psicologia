@@ -13,13 +13,6 @@ function hoyBogota(): string {
   }).format(new Date());
 }
 
-function formatearHora(hora: string): string {
-  const [h, m] = hora.split(":").map(Number);
-  const sufijo = h >= 12 ? "p. m." : "a. m.";
-  const h12 = h % 12 === 0 ? 12 : h % 12;
-  return `${h12}:${String(m).padStart(2, "0")} ${sufijo}`;
-}
-
 function ReprogramarCita() {
   const params = useParams<{ id: string }>();
   const searchParams = useSearchParams();
@@ -208,22 +201,22 @@ function ReprogramarCita() {
                     día.
                   </p>
                 ) : (
-                  <div className="grid grid-cols-3 gap-2">
-                    {horas.map((h) => (
-                      <button
-                        key={h}
-                        type="button"
-                        onClick={() => setHora(h)}
-                        className={`rounded-xl border px-2 py-3 text-sm transition ${
-                          hora === h
-                            ? "border-[#59614D] bg-[#59614D] text-white"
-                            : "border-gray-300 text-gray-700 hover:border-[#59614D]"
-                        }`}
-                      >
-                        {formatearHora(h)}
-                      </button>
-                    ))}
-                  </div>
+                  <>
+                    <input
+                      type="time"
+                      step={60}
+                      value={hora}
+                      onChange={(e) => setHora(e.target.value)}
+                      disabled={!token || cargandoHoras || horas.length === 0}
+                      aria-invalid={Boolean(hora && !horas.includes(hora))}
+                      className="w-full rounded-xl border border-gray-300 px-4 py-3 text-gray-700 focus:border-[#59614D] focus:outline-none disabled:opacity-50"
+                    />
+                    {hora && !horas.includes(hora) && (
+                      <p className="mt-2 text-sm text-red-600" role="status">
+                        Esa hora no está disponible. Elige otra dentro del horario de atención.
+                      </p>
+                    )}
+                  </>
                 )}
               </div>
             )}
@@ -244,7 +237,13 @@ function ReprogramarCita() {
             <button
               type="button"
               onClick={reprogramar}
-              disabled={guardando || !token || !fecha || !hora}
+              disabled={
+                guardando ||
+                !token ||
+                !fecha ||
+                !hora ||
+                !horas.includes(hora)
+              }
               className="w-full rounded-full bg-[#C56835] px-6 py-4 font-medium text-white transition hover:bg-[#a95628] disabled:cursor-not-allowed disabled:opacity-50"
             >
               {guardando ? "Reprogramando..." : "Confirmar reprogramación"}

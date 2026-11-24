@@ -5,6 +5,7 @@ import {
   agregarMinutosAFechaHora,
   citaOcupaFecha,
   esDuracionEnDias,
+  generarHorasDisponibles,
   intervalosFechaHoraSeCruzan,
   horariosSeCruzan,
   minutosDesdeHora,
@@ -30,14 +31,7 @@ type CitaRow = RowDataPacket & {
 type BloqueoRow = RowDataPacket & { inicio: string; fin: string };
 
 function generarHoras(horaInicio: string, horaFin: string) {
-  const horas: string[] = [];
-  const final = Number(horaFin.slice(0, 2));
-
-  for (let hora = Number(horaInicio.slice(0, 2)); hora < final; hora += 1) {
-    horas.push(`${String(hora).padStart(2, "0")}:00`);
-  }
-
-  return horas;
+  return generarHorasDisponibles(horaInicio, horaFin, 1);
 }
 
 export async function GET(request: Request) {

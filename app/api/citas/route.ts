@@ -6,10 +6,12 @@ import { verificarSesion } from "./../../lib/auth";
 import { enviarCorreo } from "./../../lib/email";
 import { actualizarEventoGoogleCalendar } from "./../../lib/google-calendar";
 import {
+  agregarMinutosAFechaHora,
   agregarDiasAFecha,
   citaOcupaFecha,
   esDuracionEnDias,
   horariosSeCruzan,
+  minutosDesdeHora,
   obtenerFechasHabiles,
 } from "./../../lib/horarios";
 import { obtenerAppUrl } from "./../../lib/app-url";
@@ -22,6 +24,23 @@ type CitaOcupada = RowDataPacket & {
   fecha: string;
   hora: string;
   duracion_minutos: number;
+};
+
+type HorarioSemanal = RowDataPacket & {
+  dia_semana: number;
+  hora_inicio: string;
+  hora_fin: string;
+};
+
+type HorarioEspecial = RowDataPacket & {
+  fecha: string;
+  hora_inicio: string | null;
+  hora_fin: string | null;
+};
+
+type BloqueoOcupado = RowDataPacket & {
+  inicio: string;
+  fin: string;
 };
 
 async function obtenerSesionAdmin() {
@@ -506,7 +525,9 @@ export async function PATCH(request: Request) {
         c.estado,
         COALESCE(c.cliente_nombre_registro, cl.nombre_completo) AS nombre_completo,
         cl.email,
-        s.nombre AS servicio_nombre
+        s.nombre AS servicio_nombre,
+        s.id AS servicio_id,
+        s.duracion_minutos AS servicio_duracion
       FROM citas c
       INNER JOIN clientes cl ON c.cliente_id = cl.id
       INNER JOIN servicios s ON c.servicio_id = s.id
@@ -580,11 +601,15 @@ export async function PATCH(request: Request) {
     // =====================================================
 
     if (estado === "REPROGRAMAR") {
-      if (!fecha || !hora) {
+      if (
+        typeof fecha !== "string" ||
+        !/^\d{4}-\d{2}-\d{2}$/.test(fecha) ||
+        typeof hora !== "string" ||
+        !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(hora)
+      ) {
         return NextResponse.json(
           {
-            error:
-              "La nueva fecha y hora son obligatorias.",
+            error: "Selecciona una fecha y una hora válidas.",
           },
           { status: 400 }
         );
@@ -601,29 +626,183 @@ export async function PATCH(request: Request) {
         );
       }
 
-            // ===================================================
-      // VERIFICAR DISPONIBILIDAD
-      // ===================================================
+      const duracionServicio = Number(cita.servicio_duracion) || 60;
+      const servicioPorDias = esDuracionEnDias(duracionServicio);
+      const fechasServicio = servicioPorDias
+        ? obtenerFechasHabiles(fecha, duracionServicio / 1440)
+        : [fecha];
 
-      const [citasOcupadas] = await pool.query<RowDataPacket[]>(
+      if (servicioPorDias && fechasServicio[0] !== fecha) {
+        return NextResponse.json(
+          { error: "Los servicios por días deben iniciar en un día hábil." },
+          { status: 409 }
+        );
+      }
+
+      const ultimaFechaServicio = fechasServicio[fechasServicio.length - 1];
+      const [horariosSemanales, horariosEspeciales] = await Promise.all([
+        pool.query<HorarioSemanal[]>(
+          `
+          SELECT dia_semana,
+            TIME_FORMAT(hora_inicio, '%H:%i') AS hora_inicio,
+            TIME_FORMAT(hora_fin, '%H:%i') AS hora_fin
+          FROM disponibilidad
+          WHERE activo = 1
+          `
+        ),
+        pool.query<HorarioEspecial[]>(
+          `
+          SELECT DATE_FORMAT(fecha, '%Y-%m-%d') AS fecha,
+            TIME_FORMAT(hora_inicio, '%H:%i') AS hora_inicio,
+            TIME_FORMAT(hora_fin, '%H:%i') AS hora_fin
+          FROM disponibilidad_especial
+          WHERE activo = 1 AND fecha >= ? AND fecha <= ?
+          `,
+          [fecha, ultimaFechaServicio]
+        ),
+      ]);
+
+      const obtenerHorariosDeFecha = (fechaConsulta: string) => {
+        const horariosDelDiaEspecial = horariosEspeciales[0].filter(
+          (horario) => horario.fecha === fechaConsulta
+        );
+
+        if (horariosDelDiaEspecial.length > 0) {
+          return horariosDelDiaEspecial.flatMap((horario) =>
+            horario.hora_inicio && horario.hora_fin
+              ? [{
+                  hora_inicio: horario.hora_inicio,
+                  hora_fin: horario.hora_fin,
+                }]
+              : []
+          );
+        }
+
+        const diaSemana = new Date(`${fechaConsulta}T12:00:00Z`).getUTCDay();
+        return horariosSemanales[0].filter(
+          (horario) => Number(horario.dia_semana) === diaSemana
+        );
+      };
+
+      const inicioMinutos = minutosDesdeHora(hora);
+      const duracionParaHorario = servicioPorDias ? 60 : duracionServicio;
+      const horarioPermitido = fechasServicio.every((fechaServicio) => {
+        const horariosDelDia = obtenerHorariosDeFecha(fechaServicio);
+
+        if (horariosDelDia.length === 0) return false;
+        if (fechaServicio !== fecha) return true;
+
+        const finMinutos = inicioMinutos + duracionParaHorario;
+        return horariosDelDia.some(
+          (horario) =>
+            inicioMinutos >= minutosDesdeHora(horario.hora_inicio) &&
+            finMinutos <= minutosDesdeHora(horario.hora_fin)
+        );
+      });
+
+      if (!horarioPermitido) {
+        return NextResponse.json(
+          { error: "La hora no cabe dentro del horario de atención." },
+          { status: 409 }
+        );
+      }
+
+      const [citasOcupadas] = await pool.query<CitaOcupada[]>(
         `
-        SELECT id
-        FROM citas
-        WHERE fecha = ?
-          AND hora = ?
-          AND estado IN ('PENDIENTE', 'CONFIRMADA')
-          AND id <> ?
-        LIMIT 1
+        SELECT DATE_FORMAT(c.fecha, '%Y-%m-%d') AS fecha,
+          TIME_FORMAT(c.hora, '%H:%i') AS hora,
+          s.duracion_minutos
+        FROM citas c
+        INNER JOIN servicios s ON c.servicio_id = s.id
+        WHERE c.fecha >= DATE_SUB(?, INTERVAL 365 DAY)
+          AND c.fecha <= ?
+          AND c.estado IN ('PENDIENTE', 'CONFIRMADA')
+          AND c.id <> ?
         `,
-        [fecha, hora, id]
+        [fecha, ultimaFechaServicio, id]
       );
 
-      if (citasOcupadas.length > 0) {
+      const reservaDeDiaCompletoOcupada = servicioPorDias
+        ? fechasServicio.some((fechaServicio) =>
+            citasOcupadas.some((citaOcupada) =>
+              citaOcupaFecha(
+                {
+                  fecha: String(citaOcupada.fecha),
+                  duracion_minutos: Number(citaOcupada.duracion_minutos),
+                },
+                fechaServicio
+              )
+            )
+          )
+        : citasOcupadas.some(
+            (citaOcupada) =>
+              citaOcupaFecha(
+                {
+                  fecha: String(citaOcupada.fecha),
+                  duracion_minutos: Number(citaOcupada.duracion_minutos),
+                },
+                fecha
+              ) &&
+              (String(citaOcupada.fecha) !== fecha ||
+                esDuracionEnDias(Number(citaOcupada.duracion_minutos)))
+          );
+      const duracionParaCruce = servicioPorDias ? 60 : duracionServicio;
+      const hayCruce =
+        reservaDeDiaCompletoOcupada ||
+        citasOcupadas.some(
+          (citaOcupada) =>
+            String(citaOcupada.fecha) === fecha &&
+            horariosSeCruzan(
+              hora,
+              duracionParaCruce,
+              String(citaOcupada.hora),
+              Number(citaOcupada.duracion_minutos) || 60
+            )
+        );
+
+      if (hayCruce) {
         return NextResponse.json(
-          {
-            error:
-              "La nueva fecha y hora ya están ocupadas.",
-          },
+          { error: "El horario se cruza con otra cita." },
+          { status: 409 }
+        );
+      }
+
+      const fechaFinRango = agregarDiasAFecha(ultimaFechaServicio, 1);
+      const [bloqueos] = await pool.query<BloqueoOcupado[]>(
+        `
+        SELECT DATE_FORMAT(inicio, '%Y-%m-%dT%H:%i') AS inicio,
+          DATE_FORMAT(fin, '%Y-%m-%dT%H:%i') AS fin
+        FROM bloqueos_agenda
+        WHERE activo = 1
+          AND inicio < CONCAT(?, ' 00:00:00')
+          AND fin > CONCAT(?, ' 00:00:00')
+        `,
+        [fechaFinRango, fecha]
+      );
+
+      const hayBloqueo = servicioPorDias
+        ? fechasServicio.some((fechaServicio) => {
+            const finDelDia = agregarDiasAFecha(fechaServicio, 1);
+            return bloqueos.some(
+              (bloqueo) =>
+                bloqueo.inicio < `${finDelDia}T00:00` &&
+                bloqueo.fin > `${fechaServicio}T00:00`
+            );
+          })
+        : bloqueos.some(
+            (bloqueo) =>
+              bloqueo.inicio <
+                agregarMinutosAFechaHora(
+                  fecha,
+                  hora,
+                  duracionParaCruce
+                ) &&
+              `${fecha}T${hora}` < bloqueo.fin
+          );
+
+      if (hayBloqueo) {
+        return NextResponse.json(
+          { error: "El horario seleccionado está bloqueado." },
           { status: 409 }
         );
       }
