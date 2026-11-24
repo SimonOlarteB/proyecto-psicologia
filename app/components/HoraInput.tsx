@@ -17,10 +17,12 @@ function separarHora(hora: string) {
   if (!coincidencia) return null;
 
   const horas24 = Number(coincidencia[1]);
+  const periodo: "AM" | "PM" = horas24 >= 12 ? "PM" : "AM";
+
   return {
     hora: String(horas24 % 12 || 12),
     minuto: coincidencia[2],
-    periodo: horas24 >= 12 ? "PM" : "AM",
+    periodo,
   };
 }
 
