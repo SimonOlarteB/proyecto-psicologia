@@ -3,6 +3,7 @@
 import { use, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { formatearDuracion } from "../lib/duracion";
+import HoraInput from "../components/HoraInput";
 import RichText from "../components/RichText";
 import {
   agregarMinutosAFechaHora,
@@ -1100,21 +1101,19 @@ className="leading-6 [overflow-wrap:anywhere]"
                     Hora
                   </label>
 
-                  <input
-                    type="time"
-                    step={60}
+                  <HoraInput
                     value={hora}
-                    onChange={(e) => setHora(e.target.value)}
+                    onChange={setHora}
+                    label="Hora de la cita"
                     disabled={!fecha}
-                    aria-invalid={Boolean(
+                    invalid={Boolean(
                       hora && !estadoHoraSeleccionada?.disponible
                     )}
-                    aria-describedby={
+                    describedBy={
                       hora && !estadoHoraSeleccionada?.disponible
                         ? "estado-hora"
                         : undefined
                     }
-                    className="date-input box-border block w-full min-w-0 rounded-xl border border-[#D8D0C5] bg-white px-4 py-3 outline-none focus:border-[#C56835] disabled:bg-[#F7F1E9] disabled:text-[#999]"
                   />
                   {hora && estadoHoraSeleccionada && !estadoHoraSeleccionada.disponible && (
                     <p

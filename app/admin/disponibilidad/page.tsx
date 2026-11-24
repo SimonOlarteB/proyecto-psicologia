@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import HoraInput from "../../components/HoraInput";
 
 interface Disponibilidad {
   id: number;
@@ -708,12 +709,11 @@ function formatearFechaHoraLocal(valor: string) {
     Hora de inicio
   </label>
 
-  <input
-    type="time"
-    step={60}
+  <HoraInput
     value={horaInicio}
-    onChange={(e) => setHoraInicio(e.target.value)}
-    className="w-full rounded-xl border border-[#D8D2C9] bg-white px-4 py-3 text-sm text-[#3F4635] outline-none focus:border-[#C56835]"
+    onChange={setHoraInicio}
+    label="Hora de inicio"
+    className="text-sm"
   />
 </div>
 
@@ -724,12 +724,11 @@ function formatearFechaHoraLocal(valor: string) {
     Hora de fin
   </label>
 
-  <input
-    type="time"
-    step={60}
+  <HoraInput
     value={horaFin}
-    onChange={(e) => setHoraFin(e.target.value)}
-    className="w-full rounded-xl border border-[#D8D2C9] bg-white px-4 py-3 text-sm text-[#3F4635] outline-none focus:border-[#C56835]"
+    onChange={setHoraFin}
+    label="Hora de fin"
+    className="text-sm"
   />
 </div>
             </div>
@@ -951,14 +950,11 @@ function formatearFechaHoraLocal(valor: string) {
             Hora de inicio
           </label>
 
-          <input
-            type="time"
-            step={60}
+          <HoraInput
             value={horaInicioEspecial}
-            onChange={(e) =>
-              setHoraInicioEspecial(e.target.value)
-            }
-            className="w-full rounded-xl border border-[#D8D2C9] bg-white px-4 py-3 text-sm text-[#3F4635] outline-none focus:border-[#C56835]"
+            onChange={setHoraInicioEspecial}
+            label="Hora de inicio especial"
+            className="text-sm"
           />
         </div>
 
@@ -969,14 +965,11 @@ function formatearFechaHoraLocal(valor: string) {
             Hora de fin
           </label>
 
-          <input
-            type="time"
-            step={60}
+          <HoraInput
             value={horaFinEspecial}
-            onChange={(e) =>
-              setHoraFinEspecial(e.target.value)
-            }
-            className="w-full rounded-xl border border-[#D8D2C9] bg-white px-4 py-3 text-sm text-[#3F4635] outline-none focus:border-[#C56835]"
+            onChange={setHoraFinEspecial}
+            label="Hora de fin especial"
+            className="text-sm"
           />
         </div>
 
@@ -1142,17 +1135,16 @@ function formatearFechaHoraLocal(valor: string) {
                   <label className="mb-2 mt-4 block text-sm font-medium text-[#3F4635]">
                     Hora de inicio
                   </label>
-                  <input
-                    type="time"
-                    step={60}
+                  <HoraInput
                     value={inicioBloqueo.hora}
-                    onChange={(e) =>
+                    onChange={(hora) =>
                       setInicioBloqueo((actual) => ({
                         ...actual,
-                        hora: e.target.value,
+                        hora,
                       }))
                     }
-                    className="w-full rounded-xl border border-[#D8D2C9] bg-white px-4 py-3 text-sm text-[#3F4635] outline-none focus:border-[#C56835]"
+                    label="Hora de inicio del bloqueo"
+                    className="text-sm"
                   />
                 </div>
                 <div>
@@ -1171,17 +1163,16 @@ function formatearFechaHoraLocal(valor: string) {
                   <label className="mb-2 mt-4 block text-sm font-medium text-[#3F4635]">
                     Hora final
                   </label>
-                  <input
-                    type="time"
-                    step={60}
+                  <HoraInput
                     value={finBloqueo.hora}
-                    onChange={(e) =>
+                    onChange={(hora) =>
                       setFinBloqueo((actual) => ({
                         ...actual,
-                        hora: e.target.value,
+                        hora,
                       }))
                     }
-                    className="w-full rounded-xl border border-[#D8D2C9] bg-white px-4 py-3 text-sm text-[#3F4635] outline-none focus:border-[#C56835]"
+                    label="Hora final del bloqueo"
+                    className="text-sm"
                   />
                 </div>
               </div>

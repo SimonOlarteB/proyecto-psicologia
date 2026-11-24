@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import AdminNav from "../components/AdminNav";
+import HoraInput from "../components/HoraInput";
 import { generarHorasDisponibles } from "../lib/horarios";
 
 type DisponibilidadSemanal = {
@@ -1299,18 +1300,17 @@ export default function AdminPage() {
                                         Nueva hora
                                     </label>
 
-                                    <input
-                                        type="time"
-                                        step={60}
+                                    <HoraInput
                                         value={nuevaHora}
-                                        onChange={(e) => setNuevaHora(e.target.value)}
+                                        onChange={setNuevaHora}
+                                        label="Nueva hora de la cita"
                                         disabled={
                                             !nuevaFecha ||
                                             cargandoDisponibilidad ||
                                             procesandoReprogramacion ||
                                             horasDisponibles.length === 0
                                         }
-                                        className="w-full rounded-2xl border border-[#D8D0C5] bg-white px-4 py-3 text-sm text-[#3F4635] outline-none transition focus:border-[#C56835] disabled:bg-[#F7F1E9] disabled:text-[#999]"
+                                        className="rounded-2xl text-sm"
                                     />
 
                                     {errorDisponibilidad && (

@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
+import HoraInput from "../../../components/HoraInput";
 
 function hoyBogota(): string {
   return new Intl.DateTimeFormat("en-CA", {
@@ -202,17 +203,25 @@ function ReprogramarCita() {
                   </p>
                 ) : (
                   <>
-                    <input
-                      type="time"
-                      step={60}
+                    <HoraInput
                       value={hora}
-                      onChange={(e) => setHora(e.target.value)}
+                      onChange={setHora}
+                      label="Hora de la cita"
                       disabled={!token || cargandoHoras || horas.length === 0}
-                      aria-invalid={Boolean(hora && !horas.includes(hora))}
-                      className="w-full rounded-xl border border-gray-300 px-4 py-3 text-gray-700 focus:border-[#59614D] focus:outline-none disabled:opacity-50"
+                      invalid={Boolean(hora && !horas.includes(hora))}
+                      describedBy={
+                        hora && !horas.includes(hora)
+                          ? "estado-hora-reprogramacion"
+                          : undefined
+                      }
+                      className="rounded-xl border-gray-300 focus-within:border-[#59614D]"
                     />
                     {hora && !horas.includes(hora) && (
-                      <p className="mt-2 text-sm text-red-600" role="status">
+                      <p
+                        id="estado-hora-reprogramacion"
+                        className="mt-2 text-sm text-red-600"
+                        role="status"
+                      >
                         Esa hora no está disponible. Elige otra dentro del horario de atención.
                       </p>
                     )}
